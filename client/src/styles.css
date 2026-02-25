@@ -1,0 +1,41 @@
+body {
+  font-family: system-ui, sans-serif;
+  background-color: #ffffff;
+  color: #111111;
+  margin: 0;
+  padding: 0;
+}
+
+h2 {
+  color: #6b4f3a; /* brown */
+  text-align: center;
+}
+
+table {
+  border-collapse: collapse;
+  width: 80%;
+  margin: 20px auto;
+}
+
+th, td {
+  padding: 10px;
+  border: 1px solid #6b4f3a;
+  text-align: center;
+}
+
+input {
+  padding: 5px;
+  width: 80px;
+}
+
+button {
+  background-color: #6b4f3a;
+  color: white;
+  padding: 8px 16px;
+  border: none;
+  cursor: pointer;
+}
+
+button:hover {
+  background-color: #a67c52;
+}
