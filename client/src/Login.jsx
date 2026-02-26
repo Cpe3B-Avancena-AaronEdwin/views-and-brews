@@ -1,16 +1,15 @@
+// client/src/Login.jsx
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 const API = "http://localhost:5000";
 
-export default function Login() {
+export default function Login({ setIsAdminLoggedIn }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const navigate = useNavigate();
 
   const handleLogin = async () => {
-    if (!username || !password) return alert("Enter username and password");
-
     try {
       const res = await fetch(`${API}/api/login`, {
         method: "POST",
@@ -18,37 +17,23 @@ export default function Login() {
         body: JSON.stringify({ username, password })
       });
 
-      const data = await res.json();
-
       if (!res.ok) {
-        return alert(data.message || "Invalid login");
+        alert("Invalid credentials");
+        return;
       }
 
-      // Successful login → go to admin dashboard
+      setIsAdminLoggedIn(true);
       navigate("/admin");
-
-    } catch (err) {
-      console.error(err);
-      alert("Server not responding");
+    } catch {
+      alert("Server error");
     }
   };
 
   return (
-    <div style={{ textAlign: "center", marginTop: "100px" }}>
+    <div style={{ padding: 50 }}>
       <h1>Admin Login</h1>
-      <input
-        placeholder="Username"
-        value={username}
-        onChange={(e) => setUsername(e.target.value)}
-      />
-      <br />
-      <input
-        type="password"
-        placeholder="Password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-      />
-      <br />
+      <input placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} />
+      <input placeholder="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
       <button onClick={handleLogin}>Login</button>
     </div>
   );
