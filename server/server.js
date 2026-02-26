@@ -1,65 +1,121 @@
 import express from "express";
-import mysql from "mysql2";
 import cors from "cors";
-import bodyParser from "body-parser";
+import mysql from "mysql2";
 
 const app = express();
 app.use(cors());
-app.use(bodyParser.json());
+app.use(express.json());
 
-// MySQL connection
+/* ================= DB CONNECTION ================= */
+
 const db = mysql.createConnection({
   host: "localhost",
-  user: "root",         // change if your MySQL username is different
-  password: "189466164",         // put your MySQL password here
+  user: "root",
+  password: "189466164", // ← change this
   database: "views_and_brews"
 });
 
-// Connect to database
-db.connect(err => {
+db.connect((err) => {
   if (err) {
-    console.error("Database connection failed:", err);
+    console.log("Database connection failed:", err);
   } else {
-    console.log("Connected to MySQL database");
+    console.log("Connected to MySQL");
   }
 });
 
-// ===== Routes =====
+/* ================= AUTH (SIMPLE ADMIN LOGIN) ================= */
 
-// Admin login
-app.post("/login", (req, res) => {
+app.post("/api/login", (req, res) => {
   const { username, password } = req.body;
-  db.query(
-    "SELECT * FROM admins WHERE username=? AND password=?",
-    [username, password],
-    (err, results) => {
-      if (err) return res.json({ success: false, error: err });
-      res.json({ success: results.length > 0 });
-    }
-  );
+
+  if (username === "admin" && password === "1234") {
+    res.json({ success: true });
+  } else {
+    res.status(401).json({ success: false });
+  }
 });
 
-// Get all products
-app.get("/products", (req, res) => {
-  db.query("SELECT * FROM products", (err, results) => {
-    if (err) return res.json([]);
-    res.json(results);
+/* ================= PRODUCTS ================= */
+app.post("/api/products", (req, res) => {
+  try {
+    const { name, price } = req.body;
+
+    if (!name || price === undefined) {
+      return res.status(400).json({ message: "Missing name or price" });
+    }
+
+    const numericPrice = Number(price);
+    if (isNaN(numericPrice)) {
+      return res.status(400).json({ message: "Price must be a number" });
+    }
+
+    const sql = "INSERT INTO products (name, price) VALUES (?, ?)";
+    db.query(sql, [name, numericPrice], (err) => {
+      if (err) {
+        console.log("ADD PRODUCT ERROR:", err.sqlMessage);
+        return res.status(500).json({ message: err.sqlMessage });
+      }
+      res.json({ success: true });
+    });
+  } catch (err) {
+    console.log("SERVER ERROR:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+/* ================= INGREDIENTS ================= */
+
+app.get("/api/ingredients", (req, res) => {
+  db.query("SELECT * FROM ingredients ORDER BY id DESC", (err, result) => {
+    if (err) return res.status(500).json([]);
+    res.json(result);
   });
 });
 
-// Update stock
-app.put("/update-stock/:id", (req, res) => {
-  const { stock } = req.body;
-  const { id } = req.params;
+app.post("/api/ingredients", (req, res) => {
+  const { name, stock } = req.body;
+
   db.query(
-    "UPDATE products SET stock=? WHERE id=?",
-    [stock, id],
-    (err, results) => {
-      if (err) return res.json({ success: false, error: err });
-      res.json({ success: true });
+    "INSERT INTO ingredients (name, stock) VALUES (?, ?)",
+    [name, stock],
+    (err) => {
+      if (err) return res.status(500).send("Error adding ingredient");
+      res.send("Ingredient added");
     }
   );
 });
 
-// Start server
-app.listen(5000, () => console.log("Server running on port 5000"));
+// Delete product by ID
+app.delete("/api/products/:id", (req, res) => {
+  const { id } = req.params;
+
+  db.query("DELETE FROM products WHERE id = ?", [id], (err, result) => {
+    if (err) {
+      console.log("DELETE PRODUCT ERROR:", err.sqlMessage);
+      return res.status(500).json({ message: err.sqlMessage });
+    }
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    res.json({ success: true });
+  });
+});
+
+// get products
+// Get all products
+app.get("/api/products", (req, res) => {
+  db.query("SELECT * FROM products", (err, results) => {
+    if (err) {
+      console.log("FETCH PRODUCTS ERROR:", err.sqlMessage);
+      return res.status(500).json({ message: err.sqlMessage });
+    }
+    res.json(results);
+  });
+});
+/* ================= START SERVER ================= */
+
+app.listen(5000, () => {
+  console.log("Server running on port 5000");
+});
