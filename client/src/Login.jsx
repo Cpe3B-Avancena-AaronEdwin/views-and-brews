@@ -1,70 +1,67 @@
-// client/src/Login.jsx
 import { useState } from "react";
-import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
-const API_URL = "http://localhost:5000";
+const API = "http://localhost:5000";
 
 export default function Login() {
-  const navigate = useNavigate();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
-  const handleLogin = async (e) => {
-    e.preventDefault();
+  const navigate = useNavigate();
+
+  const handleLogin = async () => {
+    setError("");
+
     try {
-      const res = await axios.post(`${API_URL}/login`, { username, password });
-      if (res.data.success) {
-        navigate("/admin"); // Redirect to admin dashboard
+      const res = await fetch(`${API}/api/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ username, password })
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        navigate("/admin");
       } else {
-        setError("Invalid username or password");
+        setError("Invalid login");
       }
     } catch (err) {
-      console.error(err);
-      setError("Server error. Try again.");
+      console.error("Login request failed:", err);
+      setError("Server not responding");
     }
   };
 
   return (
-    <div style={{ maxWidth: "400px", margin: "50px auto", textAlign: "center" }}>
+    <div style={{ padding: 20 }}>
       <h1>Admin Login</h1>
-      <form onSubmit={handleLogin}>
-        <input
-          type="text"
-          placeholder="Username"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          style={{ width: "100%", padding: "10px", margin: "10px 0" }}
-        />
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          style={{ width: "100%", padding: "10px", margin: "10px 0" }}
-        />
-        <button type="submit" style={{ padding: "10px 20px", cursor: "pointer" }}>
-          Login
-        </button>
-      </form>
 
+      <input
+        placeholder="Username"
+        value={username}
+        onChange={(e) => setUsername(e.target.value)}
+      />
+
+      <br /><br />
+
+      <input
+        type="password"
+        placeholder="Password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+      />
+
+      <br /><br />
+
+      <button onClick={handleLogin}>Login</button>
+
+      <br /><br />
       {error && <p style={{ color: "red" }}>{error}</p>}
 
-      {/* Back to Home Button */}
-      <button
-        onClick={() => navigate("/")}
-        style={{
-          marginTop: "20px",
-          padding: "8px 16px",
-          backgroundColor: "#222", // black
-          color: "#fff",           // white
-          border: "none",
-          cursor: "pointer"
-        }}
-      >
-        Back to Home
-      </button>
+      <button onClick={() => navigate("/")}>Back to Home</button>
     </div>
   );
 }
