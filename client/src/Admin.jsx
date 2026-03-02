@@ -1,4 +1,3 @@
-// client/src/Admin.jsx
 import { useState, useEffect } from "react";
 import Navbar from "./Navbar";
 
@@ -10,32 +9,25 @@ export default function Admin() {
   const [products, setProducts] = useState([]);
   const [ingredients, setIngredients] = useState([]);
 
-  const [productName, setProductName] = useState("");
+  const [name, setName] = useState("");
   const [price, setPrice] = useState("");
+  const [image, setImage] = useState(null);
 
   const [ingredientName, setIngredientName] = useState("");
   const [stock, setStock] = useState("");
 
-  /* ================= FETCH DATA ================= */
+  /* ================= FETCH ================= */
 
   const fetchProducts = async () => {
-    try {
-      const res = await fetch(`${API}/api/products`);
-      const data = await res.json();
-      setProducts(Array.isArray(data) ? data : []);
-    } catch {
-      setProducts([]);
-    }
+    const res = await fetch(`${API}/api/products`);
+    const data = await res.json();
+    setProducts(data);
   };
 
   const fetchIngredients = async () => {
-    try {
-      const res = await fetch(`${API}/api/ingredients`);
-      const data = await res.json();
-      setIngredients(Array.isArray(data) ? data : []);
-    } catch {
-      setIngredients([]);
-    }
+    const res = await fetch(`${API}/api/ingredients`);
+    const data = await res.json();
+    setIngredients(data);
   };
 
   useEffect(() => {
@@ -46,140 +38,206 @@ export default function Admin() {
   /* ================= PRODUCTS ================= */
 
   const addProduct = async () => {
-    if (!productName.trim() || !price) return alert("Enter product name and price");
+    const formData = new FormData();
+    formData.append("name", name);
+    formData.append("price", price);
+    if (image) formData.append("image", image);
 
-    try {
-      const res = await fetch(`${API}/api/products`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: productName, price: Number(price) })
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        return alert(data.message || "Failed to add product");
-      }
-      setProductName(""); setPrice(""); fetchProducts();
-    } catch (err) { console.error(err); alert("Server error"); }
+    await fetch(`${API}/api/products`, {
+      method: "POST",
+      body: formData
+    });
+
+    setName("");
+    setPrice("");
+    setImage(null);
+    fetchProducts();
   };
 
   const deleteProduct = async (id) => {
-    try {
-      const res = await fetch(`${API}/api/products/${id}`, { method: "DELETE" });
-      if (!res.ok) {
-        const data = await res.json();
-        return alert(data.message || "Failed to delete product");
-      }
-      fetchProducts();
-    } catch (err) { console.error(err); alert("Server error"); }
+    await fetch(`${API}/api/products/${id}`, { method: "DELETE" });
+    fetchProducts();
   };
 
   /* ================= INGREDIENTS ================= */
 
   const addIngredient = async () => {
-    if (!ingredientName.trim() || stock === "") return;
-    try {
-      const res = await fetch(`${API}/api/ingredients`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: ingredientName, stock: Number(stock) })
-      });
-      if (!res.ok) return alert("Failed to add ingredient");
-      setIngredientName(""); setStock(""); fetchIngredients();
-    } catch (err) { console.error(err); }
-  };
+  if (!ingredientName || !stock || !price) return;
 
-  const deleteIngredient = async (id) => {
-    try {
-      await fetch(`${API}/api/ingredients/${id}`, { method: "DELETE" });
-      fetchIngredients();
-    } catch (err) { console.error(err); }
-  };
-
-  const updateIngredientStock = async (id, newStock) => {
-    try {
-      if (newStock < 0) return;
-      await fetch(`${API}/api/ingredients/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ stock: newStock })
-      });
-      fetchIngredients();
-    } catch (err) { console.error(err); }
-  };
-
-  /* ================= UI STYLES ================= */
-
-  const tabButtonStyle = (active) => ({
-    padding: "10px 20px",
-    marginRight: 10,
-    borderRadius: 5,
-    border: "none",
-    cursor: "pointer",
-    backgroundColor: active ? "#6b4f3a" : "#ccc",
-    color: active ? "#fff" : "#333",
-    fontWeight: active ? "bold" : "normal"
+  await fetch(`${API}/api/ingredients`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: ingredientName,
+      stock: Number(stock),
+      price: Number(price)
+    })
   });
 
-  const inputStyle = { padding: 8, marginRight: 10, marginBottom: 10, borderRadius: 4, border: "1px solid #ccc" };
-  const buttonStyle = { padding: "8px 16px", border: "none", borderRadius: 4, backgroundColor: "#6b4f3a", color: "#fff", cursor: "pointer", marginBottom: 10 };
-  const listStyle = { listStyle: "none", padding: 0 };
-  const listItemStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: 10, marginBottom: 5, border: "1px solid #ccc", borderRadius: 5, backgroundColor: "#fff7f0" };
-  const quantityButton = { padding: "2px 8px", margin: "0 5px", borderRadius: 3, border: "none", backgroundColor: "#6b4f3a", color: "#fff", cursor: "pointer" };
+  setIngredientName("");
+  setStock("");
+  setPrice("");
+  fetchIngredients();
+};
+
+  const deleteIngredient = async (id) => {
+    await fetch(`${API}/api/ingredients/${id}`, {
+      method: "DELETE"
+    });
+    fetchIngredients();
+  };
+
+  const updateStock = async (id, change) => {
+    await fetch(`${API}/api/ingredients/${id}/stock`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ change })
+    });
+    fetchIngredients();
+  };
 
   /* ================= UI ================= */
 
+  const tabStyle = (active) => ({
+    padding: "10px 20px",
+    marginRight: 10,
+    border: "none",
+    borderRadius: 6,
+    background: active ? "#6b4f3a" : "#ddd",
+    color: active ? "#fff" : "#333",
+    cursor: "pointer"
+  });
+
+  const card = {
+    background: "#fff",
+    padding: 20,
+    borderRadius: 10,
+    marginBottom: 20,
+    boxShadow: "0 2px 6px rgba(0,0,0,0.1)"
+  };
+
   return (
-    <div style={{ backgroundColor: "#fff7f0", minHeight: "100vh" }}>
+    <div style={{ background: "#fff7f0", minHeight: "100vh" }}>
       <Navbar />
-      <div style={{ padding: 30, maxWidth: 800, margin: "0 auto" }}>
-        <h1 style={{ textAlign: "center", color: "#6b4f3a" }}>Admin Dashboard</h1>
+
+      <div style={{ maxWidth: 900, margin: "auto", padding: 40 }}>
+        <h1 style={{ color: "#6b4f3a" }}>Admin Dashboard</h1>
 
         <div style={{ marginBottom: 20 }}>
-          <button style={tabButtonStyle(tab === "products")} onClick={() => setTab("products")}>Products</button>
-          <button style={tabButtonStyle(tab === "ingredients")} onClick={() => setTab("ingredients")}>Ingredients</button>
+          <button style={tabStyle(tab === "products")} onClick={() => setTab("products")}>
+            Products
+          </button>
+
+          <button style={tabStyle(tab === "ingredients")} onClick={() => setTab("ingredients")}>
+            Ingredients
+          </button>
         </div>
 
+        {/* ================= PRODUCTS ================= */}
+
         {tab === "products" && (
-          <div>
+          <div style={card}>
             <h2>Products</h2>
-            <div>
-              <input style={inputStyle} placeholder="Product name" value={productName} onChange={(e) => setProductName(e.target.value)} />
-              <input style={inputStyle} placeholder="Price" value={price} onChange={(e) => setPrice(e.target.value)} />
-              <button style={buttonStyle} onClick={addProduct}>Add Product</button>
-            </div>
-            <ul style={listStyle}>
-              {products.length === 0 ? <p>No products</p> : products.map((p) => (
-                <li key={p.id} style={listItemStyle}>
-                  <span>{p.name} — ₱{p.price}</span>
-                  <button style={{ ...buttonStyle, backgroundColor: "#c94c4c" }} onClick={() => deleteProduct(p.id)}>Delete</button>
-                </li>
-              ))}
-            </ul>
+
+            <input
+              placeholder="Name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+
+            <input
+              placeholder="Price"
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+            />
+
+            <input type="file" onChange={(e) => setImage(e.target.files[0])} />
+
+            <button onClick={addProduct}>Add</button>
+
+            <hr />
+
+            {products.map((p) => (
+              <div key={p.id} style={{ marginBottom: 10 }}>
+                <img
+                  src={p.image ? API + p.image : "/placeholder.png"}
+                  width="80"
+                  style={{ borderRadius: 8 }}
+                />
+                {" "}
+                {p.name} — ₱{p.price}
+                <button onClick={() => deleteProduct(p.id)}>Delete</button>
+              </div>
+            ))}
           </div>
         )}
 
+        {/* ================= INGREDIENTS ================= */}
+
         {tab === "ingredients" && (
-          <div>
-            <h2>Ingredients</h2>
-            <div>
-              <input style={inputStyle} placeholder="Ingredient name" value={ingredientName} onChange={(e) => setIngredientName(e.target.value)} />
-              <input style={inputStyle} placeholder="Stock" type="number" value={stock} onChange={(e) => setStock(e.target.value)} />
-              <button style={buttonStyle} onClick={addIngredient}>Add Ingredient</button>
-            </div>
-            <ul style={listStyle}>
-              {ingredients.length === 0 ? <p>No ingredients</p> : ingredients.map((i) => (
-                <li key={i.id} style={listItemStyle}>
-                  <span>{i.name} — {i.stock}</span>
-                  <div>
-                    <button style={quantityButton} onClick={() => updateIngredientStock(i.id, i.stock - 1)}>−</button>
-                    <button style={quantityButton} onClick={() => updateIngredientStock(i.id, i.stock + 1)}>+</button>
-                    <button style={{ ...buttonStyle, backgroundColor: "#c94c4c" }} onClick={() => deleteIngredient(i.id)}>Delete</button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+  <div style={card}>
+    <h2>Ingredients Inventory</h2>
+
+    <div style={{ marginBottom: 15 }}>
+      <input
+        placeholder="Name"
+        value={ingredientName}
+        onChange={(e) => setIngredientName(e.target.value)}
+      />
+
+      <input
+        placeholder="Stock"
+        type="number"
+        value={stock}
+        onChange={(e) => setStock(e.target.value)}
+      />
+
+      <input
+        placeholder="Price per unit"
+        type="number"
+        value={price}
+        onChange={(e) => setPrice(e.target.value)}
+      />
+
+      <button onClick={addIngredient}>Add</button>
+    </div>
+
+    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+      <thead>
+        <tr style={{ background: "#6b4f3a", color: "white" }}>
+          <th>Name</th>
+          <th>Stock</th>
+          <th>Price</th>
+          <th>Total Value</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        {ingredients.map((i) => (
+          <tr key={i.id}>
+            <td>{i.name}</td>
+            <td>{i.stock}</td>
+            <td>₱{i.price}</td>
+            <td>₱{(i.stock * i.price).toFixed(2)}</td>
+            <td>
+              <button onClick={() => updateStock(i.id, 1)}>+</button>
+              <button onClick={() => updateStock(i.id, -1)}>-</button>
+              <button onClick={() => deleteIngredient(i.id)}>Delete</button>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+
+    <h3 style={{ marginTop: 20 }}>
+      Total Inventory Value: ₱
+      {ingredients
+        .reduce((sum, i) => sum + i.stock * i.price, 0)
+        .toFixed(2)}
+    </h3>
+  </div>
+)}
       </div>
     </div>
   );

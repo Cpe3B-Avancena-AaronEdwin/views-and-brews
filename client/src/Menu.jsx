@@ -1,51 +1,36 @@
-// client/src/Menu.jsx
-import { useState, useEffect } from "react";
-import Layout from "./Layout";
+import { useEffect, useState } from "react";
+import Navbar from "./Navbar";
 
 const API = "http://localhost:5000";
 
 export default function Menu() {
   const [products, setProducts] = useState([]);
 
-  const fetchProducts = async () => {
-    try {
-      const res = await fetch(`${API}/api/products`);
-      const data = await res.json();
-      setProducts(Array.isArray(data) ? data : []);
-    } catch {
-      setProducts([]);
-    }
-  };
-
   useEffect(() => {
-    fetchProducts();
+    fetch(`${API}/api/products`)
+      .then(res => res.json())
+      .then(setProducts);
   }, []);
 
   return (
-    <Layout>
-      <h1 style={{ textAlign: "center", color: "#6b4f4f" }}>Our Menu</h1>
-      {products.length === 0 ? (
-        <p style={{ textAlign: "center" }}>No products available</p>
-      ) : (
-        <ul style={{ listStyle: "none", padding: 0 }}>
-          {products.map((p) => (
-            <li key={p.id} style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              padding: 15,
-              border: "1px solid #e0d4c0",
-              borderRadius: 8,
-              marginBottom: 10,
-              backgroundColor: "#fff",
-              boxShadow: "0px 2px 6px rgba(0,0,0,0.1)"
-            }}>
-              <span style={{ fontWeight: 600 }}>{p.name}</span>
-              <span style={{ fontWeight: 600, color: "#6b4f4f" }}>₱{p.price}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </Layout>
+    <div style={{ background: "#fff7f0", minHeight: "100vh" }}>
+      <Navbar />
+
+      <div style={{ textAlign: "center", padding: 40 }}>
+        <h1 style={{ color: "#6b4f3a" }}>Our Menu</h1>
+
+        {products.map(p => (
+          <div key={p.id} style={{ margin: 20 }}>
+            <img
+              src={p.image ? API + p.image : "/placeholder.png"}
+              width="200"
+              style={{ borderRadius: 10 }}
+            />
+            <h3>{p.name}</h3>
+            <p>₱{p.price}</p>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
