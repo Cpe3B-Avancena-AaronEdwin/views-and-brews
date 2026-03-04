@@ -3,9 +3,9 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Feb 27, 2026 at 03:56 PM
--- Server version: 8.0.45
--- PHP Version: 8.2.12
+-- Generation Time: Mar 04, 2026 at 04:51 AM
+-- Server version: 9.6.0
+-- PHP Version: 8.0.30
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
@@ -82,6 +82,30 @@ INSERT INTO `products` (`id`, `name`, `price`) VALUES
 (11, 'kopi', 999.00),
 (12, 'kape', 69.00);
 
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `users`
+--
+
+CREATE TABLE `users` (
+  `id` int NOT NULL,
+  `full_name` varchar(100) COLLATE utf8mb4_general_ci NOT NULL,
+  `email` varchar(100) COLLATE utf8mb4_general_ci NOT NULL,
+  `password_hash` varchar(255) COLLATE utf8mb4_general_ci NOT NULL,
+  `phone` varchar(20) COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `address` text COLLATE utf8mb4_general_ci,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `users`
+--
+
+INSERT INTO `users` (`id`, `full_name`, `email`, `password_hash`, `phone`, `address`, `created_at`) VALUES
+(1, 'Rexandra Baltero', 'rexxxibaltero@gmail.com', '$2b$10$ERIrIz88lPVhg4blRrZyo.w382Du.4cd.1zEqDw4BsNesuWUm0OGm', '091234567', 'sk bulacan', '2026-03-02 16:09:32'),
+(4, 'Rexandra Baltero', 'darra@gmail.com', '$2b$10$Nzsg5zbF4FTPgwe87WAytuaMkP4PVJaKwnrWRxBv3P0aO2m60aohq', '123456789', 'blk 99', '2026-03-02 16:35:07');
+
 --
 -- Indexes for dumped tables
 --
@@ -105,6 +129,13 @@ ALTER TABLE `products`
   ADD PRIMARY KEY (`id`);
 
 --
+-- Indexes for table `users`
+--
+ALTER TABLE `users`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `email` (`email`);
+
+--
 -- AUTO_INCREMENT for dumped tables
 --
 
@@ -125,6 +156,12 @@ ALTER TABLE `ingredients`
 --
 ALTER TABLE `products`
   MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
+
+--
+-- AUTO_INCREMENT for table `users`
+--
+ALTER TABLE `users`
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
