@@ -16,7 +16,7 @@ app.use(express.json());
 const db = mysql.createConnection({
   host: "localhost",
   user: "root",
-  password: "112903"
+  password: "112903",
   database: "views_and_brews"
 });
 
@@ -235,6 +235,41 @@ app.post("/api/client-login", (req, res) => {
     // Generate JWT token
     const token = jwt.sign({ id: user.id, email: user.email }, "YOUR_SECRET_KEY", { expiresIn: "1h" });
 
-    res.json({ message: "Login successful", token });
+    res.json({
+  message: "Login successful",
+  token,
+  user: {
+    id: user.id,
+    name: user.full_name,
+    email: user.email,
+    phone: user.phone,
+    address: user.address,
+    profilePic: user.profile_pic || "" // if you have a profile pic column
+  }
+});
+  });
+});
+app.get("/api/getUser", (req, res) => {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) return res.json({ user: null });
+
+  jwt.verify(token, "YOUR_SECRET_KEY", (err, decoded) => {
+    if (err) return res.json({ user: null });
+
+    db.query("SELECT * FROM users WHERE id = ?", [decoded.id], (err, results) => {
+      if (err || results.length === 0) return res.json({ user: null });
+
+      const user = results[0];
+      res.json({
+        user: {
+          id: user.id,
+          name: user.full_name,
+          email: user.email,
+          phone: user.phone,
+          address: user.address,
+          profilePic: user.profile_pic || ""
+        }
+      });
+    });
   });
 });
