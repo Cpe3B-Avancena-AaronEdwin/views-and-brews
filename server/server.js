@@ -16,7 +16,7 @@ app.use(express.json());
 const db = mysql.createConnection({
   host: "localhost",
   user: "root",
-  password: "112903",
+  password: "112903"
   database: "views_and_brews"
 });
 
@@ -70,28 +70,60 @@ app.get("/api/products", (req, res) => {
     res.json(results);
   });
 });
-
 app.post("/api/products", upload.single("image"), (req, res) => {
-  const { name, price } = req.body;
-  const image = req.file ? `/uploads/${req.file.filename}` : null;
+  try {
+    const { name, price } = req.body;
 
-  db.query(
-    "INSERT INTO products (name, price, image) VALUES (?, ?, ?)",
-    [name, price, image],
-    err => {
-      if (err) return res.status(500).json({ success: false });
-      res.json({ success: true });
+    console.log("BODY:", req.body);
+    console.log("FILE:", req.file);
+
+    // Validation
+    if (!name || !price) {
+      return res.status(400).json({
+        success: false,
+        message: "Name and price are required"
+      });
     }
-  );
-});
 
-app.delete("/api/products/:id", (req, res) => {
-  db.query("DELETE FROM products WHERE id=?", [req.params.id], err => {
-    if (err) return res.status(500).json({ success: false });
-    res.json({ success: true });
-  });
-});
+    const numericPrice = parseFloat(price);
+    if (isNaN(numericPrice)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid price format"
+      });
+    }
 
+    const image = req.file
+      ? `/uploads/${req.file.filename}`
+      : null;
+
+    db.query(
+      "INSERT INTO products (name, price, image) VALUES (?, ?, ?)",
+      [name, numericPrice, image],
+      (err, result) => {
+        if (err) {
+          console.log("INSERT ERROR:", err);
+          return res.status(500).json({
+            success: false,
+            message: "Database insert failed"
+          });
+        }
+
+        res.json({
+          success: true,
+          message: "Product added successfully"
+        });
+      }
+    );
+
+  } catch (error) {
+    console.log("SERVER ERROR:", error);
+    res.status(500).json({
+      success: false,
+      message: "Unexpected server error"
+    });
+  }
+});
 /* ================= INGREDIENTS ================= */
 
 // get all

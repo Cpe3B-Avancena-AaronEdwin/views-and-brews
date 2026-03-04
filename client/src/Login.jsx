@@ -13,56 +13,53 @@ export default function Login({ setIsAdminLoggedIn }) {
 
   const navigate = useNavigate();
 
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    setError("");
+const handleLogin = async (e) => {
+  e.preventDefault();
+  setError("");
+  try {
+    setLoading(true);
+    const res = await fetch(`${API}/api/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }),
+    });
 
-    if (!username || !password) {
-      setError("Please enter username and password");
+    if (!res.ok) {
+      setError("Invalid username or password");
       return;
     }
 
-    try {
-      setLoading(true);
+    const data = await res.json();
 
-      const res = await fetch(`${API}/api/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
-      });
+    // STEP 1: Save the flag to the browser's permanent memory
+    localStorage.setItem("isLoggedIn", "true"); 
+    if (data.token) localStorage.setItem("adminToken", data.token);
 
-      if (!res.ok) {
-        setError("Invalid username or password");
-        return;
-      }
+    // STEP 2: Tell React state you are logged in
+    setIsAdminLoggedIn(true);
 
-      const data = await res.json();
+    // STEP 3: Now move to the admin page
+    navigate("/admin");
+  } catch (err) {
+    setError("Server error.");
+  } finally {
+    setLoading(false);
+  }
+};
+  
+return (
 
-      if (data.token) {
-        localStorage.setItem("adminToken", data.token);
-      }
 
-      setIsAdminLoggedIn(true);
-      navigate("/admin");
-    } catch {
-      setError("Server error. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  return (
-    <div>
+    <div style={styles.pageWrapper}>
+
       <Navbar />
 
-      {/* Centered Container */}
+
       <div style={styles.container}>
         <div style={styles.card}>
-          <h2 style={{ textAlign: "center", marginBottom: "20px" }}>
-            Admin Login
-          </h2>
-
-          <form onSubmit={handleLogin}>
+          <h2 style={styles.title}>Admin Login</h2>
+          <form onSubmit={handleLogin} style={styles.form}>
             <input
               type="text"
               placeholder="Username"
@@ -80,15 +77,13 @@ export default function Login({ setIsAdminLoggedIn }) {
             />
 
             {error && <p style={styles.error}>{error}</p>}
-
-            <button
-              type="submit"
-              disabled={loading}
-              style={styles.button}
-            >
+            <button type="submit" disabled={loading} style={styles.button}>
               {loading ? "Logging in..." : "Login"}
             </button>
           </form>
+          <div style={styles.footerCurve}>
+            <span style={styles.footerText}>Views & Brews</span>
+          </div>
         </div>
       </div>
     </div>
@@ -96,40 +91,103 @@ export default function Login({ setIsAdminLoggedIn }) {
 }
 
 const styles = {
+  pageWrapper: {
+    background: "linear-gradient(135deg, #fdfcfb 0%, #e2d1c3 100%)",
+    minHeight: "100vh",
+  },
+
+
+
   container: {
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
-    height: "80vh",
+    paddingTop: "80px",
   },
+
+
+
   card: {
-    width: "350px",
-    padding: "30px",
-    borderRadius: "10px",
-    boxShadow: "0 4px 15px rgba(0,0,0,0.1)",
-    backgroundColor: "#ffffff",
+    width: "380px",
+    padding: "40px 0 0 0",
+    borderRadius: "24px",
+    backgroundColor: "#6b4f3a",
+    boxShadow: "0 20px 40px rgba(0,0,0,0.2)",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    position: "relative",
+    overflow: "hidden",
   },
+
+
+
+  title: {
+    color: "#ffffff",
+    fontSize: "32px",
+    fontWeight: "600",
+    marginBottom: "30px",
+  },
+
+
+
+  form: {
+    width: "80%",
+    marginBottom: "60px",
+  },
+
   input: {
     width: "100%",
-    padding: "10px",
+    padding: "15px",
     marginBottom: "15px",
-    borderRadius: "6px",
-    border: "1px solid #ccc",
-    fontSize: "14px",
+    borderRadius: "8px",
+    border: "none",
+    backgroundColor: "#f5f5f5",
+    fontSize: "16px",
+    boxSizing: "border-box",
   },
+
+
+
   button: {
     width: "100%",
-    padding: "10px",
-    borderRadius: "6px",
-    border: "none",
-    backgroundColor: "#007bff",
+    padding: "15px",
+    borderRadius: "8px",
+    border: "2px solid #fff",
+    backgroundColor: "transparent",
     color: "#fff",
+    fontSize: "18px",
     fontWeight: "bold",
     cursor: "pointer",
+
   },
+
+
+
   error: {
-    color: "red",
+    color: "#ffda79",
     marginBottom: "10px",
     fontSize: "14px",
+    textAlign: "center",
+  },
+
+  footerCurve: {
+    width: "140%",
+    height: "100px",
+    backgroundColor: "#fff",
+    borderRadius: "50% 50% 0 0",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: "auto",
+  },
+
+
+
+  footerText: {
+    color: "#6b4f3a",
+    fontSize: "20px",
+    fontWeight: "bold",
+    marginTop: "20px",
   },
 };
