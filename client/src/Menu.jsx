@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import Navbar from "./Navbar";
 
+
 const API = "http://localhost:5000";
 
 export default function Menu() {

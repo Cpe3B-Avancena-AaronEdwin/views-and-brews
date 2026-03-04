@@ -1,0 +1,64 @@
+/* Sidebar styling */
+.sidebar {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 250px;
+  height: 100vh;
+  background-color: #6b4f3a;
+  color: #fff;
+  padding: 2rem 1rem;
+  flex-direction: column;
+  align-items: center;
+  transition: left 0.3s ease;
+  z-index: 999;
+  overflow-y: auto;
+  margin: 0;
+}
+
+.sidebar img.profile-pic {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  margin-bottom: 2rem;
+  object-fit: cover;
+}
+
+.sidebar a,
+.sidebar button {
+  width: 100%;
+  padding: 0.8rem;
+  margin-bottom: 1rem;
+  text-align: center;
+  background-color: #301a0c;
+  color: #fff;
+  border-radius: 5px;
+  border: none;
+  font-weight: bold;
+  cursor: pointer;
+  text-decoration: none;
+}
+/* Sidebar buttons hover effect */
+.sidebar a:hover,
+.sidebar button:hover {
+  transform: scale(1.1); /* 10% bigger on hover */
+  background-color: #555; /* optional: slightly lighter background */
+}
+
+/* Make the transition smooth */
+.sidebar a,
+.sidebar button {
+  transition: transform 0.2s ease, background-color 0.2s ease;
+}
+/* Hamburger button */
+.hamburger-btn {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  z-index: 1001;
+  font-size: 2rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #302417;
+}

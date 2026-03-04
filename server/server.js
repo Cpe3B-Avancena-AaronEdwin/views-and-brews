@@ -273,3 +273,32 @@ app.get("/api/getUser", (req, res) => {
     });
   });
 });
+/* ================= GET CLIENT DATA ================= */
+
+app.get("/api/client-data", (req, res) => {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader) {
+    return res.status(401).json({ message: "No token provided" });
+  }
+
+  const token = authHeader.split(" ")[1];
+
+  jwt.verify(token, "YOUR_SECRET_KEY", (err, decoded) => {
+    if (err) {
+      return res.status(401).json({ message: "Invalid token" });
+    }
+
+    db.query(
+      "SELECT id, full_name, email, phone, address FROM users WHERE id = ?",
+      [decoded.id],
+      (err, results) => {
+        if (err) return res.status(500).json({ message: "Database error" });
+        if (results.length === 0)
+          return res.status(404).json({ message: "User not found" });
+
+        res.json(results[0]);
+      }
+    );
+  });
+});
