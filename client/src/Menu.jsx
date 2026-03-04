@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import Navbar from "./Navbar";
 
+
 const API = "http://localhost:5000";
 
 export default function Menu() {
@@ -13,23 +14,25 @@ export default function Menu() {
   }, []);
 
   return (
-    <div style={{ background: "#fff7f0", minHeight: "100vh" }}>
+    <div className="menu-container">
       <Navbar />
 
-      <div style={{ textAlign: "center", padding: 40 }}>
-        <h1 style={{ color: "#6b4f3a" }}>Our Menu</h1>
+      <div className="menu-content">
+        <h1 className="menu-title">Our Menu</h1>
 
-        {products.map(p => (
-          <div key={p.id} style={{ margin: 20 }}>
-            <img
-              src={p.image ? API + p.image : "/placeholder.png"}
-              width="200"
-              style={{ borderRadius: 10 }}
-            />
-            <h3>{p.name}</h3>
-            <p>₱{p.price}</p>
-          </div>
-        ))}
+        <div className="menu-grid">
+          {products.map(p => (
+            <div key={p.id} className="menu-item">
+              <img
+                src={p.image ? API + p.image : "/placeholder.png"}
+                alt={p.name}
+                className="menu-image"
+              />
+              <h3 className="menu-name">{p.name}</h3>
+              <p className="menu-price">₱{p.price}</p>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

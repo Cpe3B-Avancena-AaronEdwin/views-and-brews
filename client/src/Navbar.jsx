@@ -11,8 +11,6 @@ function Navbar() {
       <Link to="/" style={{ margin: "0 15px", color: "white", textDecoration: "none" }}>Home</Link>
       <Link to="/menu" style={{ margin: "0 15px", color: "white", textDecoration: "none" }}>Menu</Link>
       <Link to="/about" style={{ margin: "0 15px", color: "white", textDecoration: "none" }}>About</Link>
-      <Link to="/signup"style={{ margin: "0 15px", color: "white", textDecoration: "none" }}>Sign Up</Link> 
-      <Link to="/client-login"style={{ margin: "0 15px", color: "white", textDecoration: "none" }}>Client Login</Link> 
       <Link to="/login" style={{ margin: "0 15px", color: "white", textDecoration: "none" }}>Admin</Link>
     </nav>
   );

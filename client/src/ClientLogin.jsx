@@ -1,12 +1,20 @@
-// client/src/ClientLogin.jsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
 export default function ClientLogin() {
   const [form, setForm] = useState({ email: "", password: "" });
   const [message, setMessage] = useState("");
+  const [loggedIn, setLoggedIn] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    // Check if client is already logged in
+    const token = localStorage.getItem("token");
+    if (token) {
+      setLoggedIn(true);
+    }
+  }, []);
 
   const handleChange = e => setForm({ ...form, [e.target.name]: e.target.value });
 
@@ -16,27 +24,34 @@ export default function ClientLogin() {
     try {
       const res = await axios.post("http://localhost:5000/api/client-login", form);
 
-      // Store token in localStorage for protected routes
+      // Store token
       localStorage.setItem("token", res.data.token);
 
       setMessage(res.data.message);
+      setLoggedIn(true);
 
-      // Redirect to homepage or menu after login
-      setTimeout(() => {
-        navigate("/menu");
-      }, 500);
+      // Redirect after login
+      setTimeout(() => navigate("/home"), 500);
     } catch (err) {
-  console.log("ERROR:", err);
-  console.log("ERR RESPONSE:", err.response);
-  console.log("ERR MESSAGE:", err.message);
+      console.log("ERROR:", err);
 
-  if (err.response) {
-    setMessage(err.response.data.message);
-  } else {
-    setMessage("SERVER NOT RESPONDING");
-  }
-   }
+      if (err.response) {
+        setMessage(err.response.data.message);
+      } else {
+        setMessage("SERVER NOT RESPONDING");
+      }
+    }
   };
+
+  // If already logged in, don't show login form
+  if (loggedIn) {
+    return (
+      <div style={{ maxWidth: "400px", margin: "2rem auto", textAlign: "center" }}>
+        <h2>You are already logged in</h2>
+        <p>Go to your <strong>sidebar</strong> to see your profile and logout</p>
+      </div>
+    );
+  }
 
   return (
     <div style={{ maxWidth: "400px", margin: "2rem auto", textAlign: "center" }}>
