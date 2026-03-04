@@ -4,6 +4,8 @@ import mysql from "mysql2";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
 
 const app = express();
 app.use(cors());
@@ -14,7 +16,7 @@ app.use(express.json());
 const db = mysql.createConnection({
   host: "localhost",
   user: "root",
-  password: "",
+  password: "112903"
   database: "views_and_brews"
 });
 
@@ -182,3 +184,57 @@ app.put("/api/ingredients/:id/stock", (req, res) => {
 /* ================= START ================= */
 
 app.listen(5000, () => console.log("Server running on port 5000"));
+/* ================= CLIENT SIGNUP ================= */
+
+app.post("/api/signup", async (req, res) => {
+  const { full_name, email, password, phone, address } = req.body;
+
+  if (!full_name || !email || !password) {
+    return res.status(400).json({ message: "Full name, email, and password are required." });
+  }
+
+  try {
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    db.query(
+      "INSERT INTO users (full_name, email, password_hash, phone, address) VALUES (?, ?, ?, ?, ?)",
+      [full_name, email, hashedPassword, phone, address],
+      (err, result) => {
+        if (err) {
+          if (err.code === "ER_DUP_ENTRY") {
+            return res.status(400).json({ message: "Email already registered." });
+          }
+          return res.status(500).json({ message: "Database error." });
+        }
+        res.status(201).json({ message: "Signup successful!" });
+      }
+    );
+  } catch (error) {
+    res.status(500).json({ message: "Server error." });
+  }
+});
+/* ================= CLIENT LOGIN ================= */
+
+app.post("/api/client-login", (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({ message: "Email and password are required." });
+  }
+
+  db.query("SELECT * FROM users WHERE email = ?", [email], async (err, results) => {
+    if (err) return res.status(500).json({ message: "Database error." });
+    if (results.length === 0) return res.status(400).json({ message: "Email not found." });
+
+    const user = results[0];
+
+    const match = await bcrypt.compare(password, user.password_hash);
+    if (!match) return res.status(400).json({ message: "Incorrect password." });
+
+    // Generate JWT token
+    const token = jwt.sign({ id: user.id, email: user.email }, "YOUR_SECRET_KEY", { expiresIn: "1h" });
+
+    res.json({ message: "Login successful", token });
+  });
+});
