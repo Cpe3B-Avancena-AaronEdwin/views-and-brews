@@ -1,0 +1,102 @@
+@import url("https://fonts.googleapis.com/css2?family=Alkatra:wght@700&display=swap");
+
+.admin-page-wrapper {
+  background: #fff7f0;
+  min-height: 100vh;
+}
+
+.admin-container {
+  max-width: 900px;
+  margin: auto;
+  padding: 40px;
+}
+
+.admin-title {
+  font-family: "Alkatra", system-ui; /* The new font */
+  color: #6b4f3a;
+  text-align: center;
+  margin: 0 auto 20px auto;
+  font-size: 3.5rem; /* Alkatra usually looks a bit smaller, so we boost the size */
+  font-weight: 700; /* This is the boldest weight for Alkatra */
+  letter-spacing: -1px; /* Tighter spacing looks better with this hand-drawn style */
+}
+
+.tab-container {
+  margin-bottom: 20px;
+}
+
+/* Base Tab Button Style */
+.tab-btn {
+  padding: 10px 20px;
+  margin-right: 10px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  background: #ddd;
+  color: #333;
+}
+
+/* Active Tab Style (The Brown Color) */
+.tab-btn.active {
+  background: #6b4f3a;
+  color: #fff;
+}
+
+.admin-card {
+  background: #fff;
+  padding: 20px;
+  border-radius: 10px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.input-group {
+  margin-bottom: 20px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.admin-input {
+  padding: 8px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.admin-table thead tr {
+  background: #6b4f3a;
+  color: white;
+}
+
+.admin-table th {
+  padding: 12px;
+}
+
+.admin-table td {
+  padding: 10px;
+  border-bottom: 1px solid #eee;
+}
+
+.delete-btn {
+  padding: 5px 12px;
+  background: #ff4d4d;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.logout-btn {
+  background: #e74c3c;
+  color: white;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}

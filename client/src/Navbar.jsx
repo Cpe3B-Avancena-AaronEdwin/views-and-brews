@@ -15,7 +15,10 @@ function Navbar() {
       <Link to="/client-login"style={{ margin: "0 15px", color: "white", textDecoration: "none" }}>Client Login</Link> 
       <Link to="/login" style={{ margin: "0 15px", color: "white", textDecoration: "none" }}>Admin</Link>
     </nav>
+    
   );
+  
 }
+
 
 export default Navbar;
