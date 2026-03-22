@@ -1,169 +1,125 @@
--- phpMyAdmin SQL Dump
--- version 5.2.1
--- https://www.phpmyadmin.net/
---
--- Host: 127.0.0.1
--- Generation Time: Mar 04, 2026 at 04:51 AM
--- Server version: 9.6.0
--- PHP Version: 8.0.30
-
-SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
-START TRANSACTION;
-SET time_zone = "+00:00";
-
-
-/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
-/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
-/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
-/*!40101 SET NAMES utf8mb4 */;
-
---
--- Database: `views_and_brews`
---
+-- 1. Siguraduhing tama ang Database name
+CREATE DATABASE IF NOT EXISTS `views_and_brews`;
+USE `views_and_brews`;
 
 -- --------------------------------------------------------
 
---
--- Table structure for table `admins`
---
-
-CREATE TABLE `admins` (
-  `id` int NOT NULL,
+-- 2. Table structure for table `admins` (Existing)
+CREATE TABLE IF NOT EXISTS `admins` (
+  `id` int NOT NULL AUTO_INCREMENT,
   `username` varchar(50) NOT NULL,
-  `password` varchar(255) NOT NULL
+  `password` varchar(255) NOT NULL,
+  PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-
---
--- Dumping data for table `admins`
---
-
-INSERT INTO `admins` (`id`, `username`, `password`) VALUES
-(1, 'admin', 'admin123');
 
 -- --------------------------------------------------------
 
---
--- Table structure for table `ingredients`
---
+-- 3. Table structure for table `users` (Existing, updated collation)
+CREATE TABLE IF NOT EXISTS `users` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `full_name` varchar(100) NOT NULL,
+  `email` varchar(100) NOT NULL,
+  `password_hash` varchar(255) NOT NULL,
+  `phone` varchar(20) DEFAULT NULL,
+  `address` text,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `email` (`email`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-CREATE TABLE `ingredients` (
-  `id` int NOT NULL,
+-- --------------------------------------------------------
+
+-- 4. Bagong Table: Categories (Para ma-organize ang Menu)
+CREATE TABLE IF NOT EXISTS `categories` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `name` varchar(50) NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- --------------------------------------------------------
+
+-- 5. Table structure for table `products` (Updated for Admin Menu Control)
+CREATE TABLE IF NOT EXISTS `products` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `category_id` int DEFAULT NULL,
   `name` varchar(100) NOT NULL,
-  `stock` int NOT NULL
+  `description` text,
+  `price` decimal(10,2) NOT NULL,
+  `image_url` varchar(255) DEFAULT NULL,
+  `is_active` boolean DEFAULT TRUE, -- Dito mag-ba-base ang admin kung ipapakita sa customer
+  PRIMARY KEY (`id`),
+  FOREIGN KEY (`category_id`) REFERENCES `categories`(`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-
---
--- Dumping data for table `ingredients`
---
-
-INSERT INTO `ingredients` (`id`, `name`, `stock`) VALUES
-(3, 'kape', 3);
 
 -- --------------------------------------------------------
 
---
--- Table structure for table `products`
---
-
-CREATE TABLE `products` (
-  `id` int NOT NULL,
+-- 6. Table structure for table `ingredients` (Updated for Costing with Units)
+CREATE TABLE IF NOT EXISTS `ingredients` (
+  `id` int NOT NULL AUTO_INCREMENT,
   `name` varchar(100) NOT NULL,
-  `price` decimal(10,2) NOT NULL
+  `unit` ENUM('g', 'kg', 'ml', 'L') NOT NULL, -- Dito pipili ang admin ng unit
+  `unit_cost` decimal(10,2) NOT NULL, -- Presyo base sa unit na napili (e.g. 500 per kg)
+  `stock` decimal(10,2) NOT NULL DEFAULT 0, -- Decimal para sa precise inventory
+  PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-
---
--- Dumping data for table `products`
---
-
-INSERT INTO `products` (`id`, `name`, `price`) VALUES
-(1, 'Espresso', 100.00),
-(2, 'Cappuccino', 150.00),
-(3, 'Latte', 160.00),
-(11, 'kopi', 999.00),
-(12, 'kape', 69.00);
 
 -- --------------------------------------------------------
 
---
--- Table structure for table `users`
---
+-- 7. Bagong Table: Recipes (Ang logic ng Costing Analysis)
+CREATE TABLE IF NOT EXISTS `recipes` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `product_id` int NOT NULL,
+  `ingredient_id` int NOT NULL,
+  `quantity_needed` decimal(10,2) NOT NULL, -- Ilang unit ang kailangan per product
+  PRIMARY KEY (`id`),
+  FOREIGN KEY (`product_id`) REFERENCES `products`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`ingredient_id`) REFERENCES `ingredients`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-CREATE TABLE `users` (
-  `id` int NOT NULL,
-  `full_name` varchar(100) COLLATE utf8mb4_general_ci NOT NULL,
-  `email` varchar(100) COLLATE utf8mb4_general_ci NOT NULL,
-  `password_hash` varchar(255) COLLATE utf8mb4_general_ci NOT NULL,
-  `phone` varchar(20) COLLATE utf8mb4_general_ci DEFAULT NULL,
-  `address` text COLLATE utf8mb4_general_ci,
-  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+-- --------------------------------------------------------
 
---
--- Dumping data for table `users`
---
+-- 8. Bagong Table: Orders (Para sa Customer Side ordering)
+CREATE TABLE IF NOT EXISTS `orders` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `user_id` int NOT NULL,
+  `total_amount` decimal(10,2) NOT NULL,
+  `status` ENUM('pending', 'preparing', 'completed', 'cancelled') DEFAULT 'pending',
+  `created_at` timestamp DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  FOREIGN KEY (`user_id`) REFERENCES `users`(`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-INSERT INTO `users` (`id`, `full_name`, `email`, `password_hash`, `phone`, `address`, `created_at`) VALUES
-(1, 'Rexandra Baltero', 'rexxxibaltero@gmail.com', '$2b$10$ERIrIz88lPVhg4blRrZyo.w382Du.4cd.1zEqDw4BsNesuWUm0OGm', '091234567', 'sk bulacan', '2026-03-02 16:09:32'),
-(4, 'Rexandra Baltero', 'darra@gmail.com', '$2b$10$Nzsg5zbF4FTPgwe87WAytuaMkP4PVJaKwnrWRxBv3P0aO2m60aohq', '123456789', 'blk 99', '2026-03-02 16:35:07');
+-- --------------------------------------------------------
 
---
--- Indexes for dumped tables
---
+-- 9. Bagong Table: Order Items (Para ma-track anong drinks ang binili)
+CREATE TABLE IF NOT EXISTS `order_items` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `order_id` int NOT NULL,
+  `product_id` int NOT NULL,
+  `quantity` int NOT NULL,
+  `price_at_purchase` decimal(10,2) NOT NULL, -- Para kahit mag-change price, record stays same
+  PRIMARY KEY (`id`),
+  FOREIGN KEY (`order_id`) REFERENCES `orders`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`product_id`) REFERENCES `products`(`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
---
--- Indexes for table `admins`
---
-ALTER TABLE `admins`
-  ADD PRIMARY KEY (`id`);
+-- --------------------------------------------------------
 
---
--- Indexes for table `ingredients`
---
-ALTER TABLE `ingredients`
-  ADD PRIMARY KEY (`id`);
+-- Sample Data Injection (Optional)
+INSERT INTO `categories` (`name`) VALUES ('Espresso Based'), ('Non-Coffee');
 
---
--- Indexes for table `products`
---
-ALTER TABLE `products`
-  ADD PRIMARY KEY (`id`);
+INSERT INTO `ingredients` (`name`, `unit`, `unit_cost`, `stock`) VALUES 
+('Coffee Beans', 'kg', 650.00, 5.00), -- 5kg stock, 650 per kg
+('Fresh Milk', 'L', 95.00, 10.00);   -- 10L stock, 95 per L
 
---
--- Indexes for table `users`
---
-ALTER TABLE `users`
-  ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `email` (`email`);
+INSERT INTO `products` (`category_id`, `name`, `price`, `is_active`) VALUES 
+(1, 'Espresso', 100.00, 1),
+(1, 'Latte', 150.00, 1);
 
---
--- AUTO_INCREMENT for dumped tables
---
+-- Isang Latte recipe: 18g beans at 200ml milk
+-- Note: Dahil kg/L ang base unit, ang system math mo dapat nag-ko-convert
+INSERT INTO `recipes` (`product_id`, `ingredient_id`, `quantity_needed`) VALUES 
+(2, 1, 0.018), -- 18 grams in kg
+(2, 2, 0.200); -- 200 ml in L
 
---
--- AUTO_INCREMENT for table `admins`
---
-ALTER TABLE `admins`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
-
---
--- AUTO_INCREMENT for table `ingredients`
---
-ALTER TABLE `ingredients`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
-
---
--- AUTO_INCREMENT for table `products`
---
-ALTER TABLE `products`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
-
---
--- AUTO_INCREMENT for table `users`
---
-ALTER TABLE `users`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 COMMIT;
-
-/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
-/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
-/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
