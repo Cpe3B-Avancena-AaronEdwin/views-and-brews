@@ -112,9 +112,6 @@ export default function Home() {
 
       {/* SECTION 2: VISION & MISSION */}
       <section className="about-section">
-        <div className="scroll-indicator">
-          <i className="fa-solid fa-chevron-down"></i>
-        </div>
 
         <div className="about-content">
           <div className="about-card">
