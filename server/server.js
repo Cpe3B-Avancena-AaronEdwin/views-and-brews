@@ -71,18 +71,19 @@ app.get("/api/products", (req, res) => {
     res.json(results);
   });
 });
+
 app.post("/api/products", upload.single("image"), (req, res) => {
   try {
-    const { name, price } = req.body;
+    const { name, category, price } = req.body;
 
     console.log("BODY:", req.body);
     console.log("FILE:", req.file);
 
     // Validation
-    if (!name || !price) {
+    if (!name || !category || !price) {
       return res.status(400).json({
         success: false,
-        message: "Name and price are required"
+        message: "Name, category, and price are required"
       });
     }
 
@@ -99,8 +100,8 @@ app.post("/api/products", upload.single("image"), (req, res) => {
       : null;
 
     db.query(
-      "INSERT INTO products (name, price, image) VALUES (?, ?, ?)",
-      [name, numericPrice, image],
+      "INSERT INTO products (name, category, price, image) VALUES (?, ?, ?, ?)",
+      [name, category, numericPrice, image],
       (err, result) => {
         if (err) {
           console.log("INSERT ERROR:", err);
@@ -125,6 +126,7 @@ app.post("/api/products", upload.single("image"), (req, res) => {
     });
   }
 });
+
 /* ================= INGREDIENTS ================= */
 
 // get all
@@ -185,6 +187,7 @@ app.put("/api/ingredients/:id/stock", (req, res) => {
 /* ================= START ================= */
 
 app.listen(5000, () => console.log("Server running on port 5000"));
+
 /* ================= CLIENT SIGNUP ================= */
 
 app.post("/api/signup", async (req, res) => {
@@ -215,6 +218,7 @@ app.post("/api/signup", async (req, res) => {
     res.status(500).json({ message: "Server error." });
   }
 });
+
 /* ================= CLIENT LOGIN ================= */
 
 app.post("/api/client-login", (req, res) => {
@@ -234,22 +238,27 @@ app.post("/api/client-login", (req, res) => {
     if (!match) return res.status(400).json({ message: "Incorrect password." });
 
     // Generate JWT token
-    const token = jwt.sign({ id: user.id, email: user.email }, "YOUR_SECRET_KEY", { expiresIn: "1h" });
+    const token = jwt.sign(
+      { id: user.id, email: user.email },
+      "YOUR_SECRET_KEY",
+      { expiresIn: "1h" }
+    );
 
     res.json({
-  message: "Login successful",
-  token,
-  user: {
-    id: user.id,
-    name: user.full_name,
-    email: user.email,
-    phone: user.phone,
-    address: user.address,
-    profilePic: user.profile_pic || "" // if you have a profile pic column
-  }
-});
+      message: "Login successful",
+      token,
+      user: {
+        id: user.id,
+        name: user.full_name,
+        email: user.email,
+        phone: user.phone,
+        address: user.address,
+        profilePic: user.profile_pic || ""
+      }
+    });
   });
 });
+
 app.get("/api/getUser", (req, res) => {
   const token = req.headers.authorization?.split(" ")[1];
   if (!token) return res.json({ user: null });
@@ -274,6 +283,7 @@ app.get("/api/getUser", (req, res) => {
     });
   });
 });
+
 /* ================= GET CLIENT DATA ================= */
 
 app.get("/api/client-data", (req, res) => {
@@ -302,4 +312,128 @@ app.get("/api/client-data", (req, res) => {
       }
     );
   });
+});
+/* ================= PRODUCT INGREDIENTS / COSTING ================= */
+
+// get all recipe ingredients for one product
+app.get("/api/products/:id/ingredients", (req, res) => {
+  db.query(
+    `SELECT 
+      pi.id,
+      pi.product_id,
+      pi.ingredient_id,
+      pi.quantity,
+      i.name AS ingredient_name,
+      i.price AS ingredient_price,
+      i.stock AS ingredient_stock
+     FROM product_ingredients pi
+     JOIN ingredients i ON pi.ingredient_id = i.id
+     WHERE pi.product_id = ?
+     ORDER BY pi.id DESC`,
+    [req.params.id],
+    (err, results) => {
+      if (err) {
+        console.log("GET PRODUCT INGREDIENTS ERROR:", err);
+        return res.status(500).json([]);
+      }
+      res.json(results);
+    }
+  );
+});
+
+// add ingredient to a product recipe
+app.post("/api/products/:id/ingredients", (req, res) => {
+  const { ingredient_id, quantity } = req.body;
+
+  if (!ingredient_id || quantity === undefined) {
+    return res.status(400).json({
+      success: false,
+      message: "ingredient_id and quantity are required"
+    });
+  }
+
+  const numericQuantity = parseFloat(quantity);
+
+  if (isNaN(numericQuantity) || numericQuantity <= 0) {
+    return res.status(400).json({
+      success: false,
+      message: "Quantity must be a valid number greater than 0"
+    });
+  }
+
+  db.query(
+    "INSERT INTO product_ingredients (product_id, ingredient_id, quantity) VALUES (?, ?, ?)",
+    [req.params.id, ingredient_id, numericQuantity],
+    (err, result) => {
+      if (err) {
+        console.log("ADD PRODUCT INGREDIENT ERROR:", err);
+        return res.status(500).json({
+          success: false,
+          message: "Database error"
+        });
+      }
+
+      res.json({
+        success: true,
+        message: "Ingredient added to product recipe"
+      });
+    }
+  );
+});
+
+// delete one ingredient from a product recipe
+app.delete("/api/product-ingredients/:id", (req, res) => {
+  db.query(
+    "DELETE FROM product_ingredients WHERE id = ?",
+    [req.params.id],
+    (err) => {
+      if (err) {
+        console.log("DELETE PRODUCT INGREDIENT ERROR:", err);
+        return res.status(500).json({ success: false });
+      }
+      res.json({ success: true });
+    }
+  );
+});
+
+// costing analysis for all products
+app.get("/api/costing-analysis", (req, res) => {
+  db.query(
+    `SELECT
+      p.id,
+      p.name,
+      p.category,
+      p.price AS selling_price,
+      IFNULL(SUM(pi.quantity * i.price), 0) AS total_cost
+     FROM products p
+     LEFT JOIN product_ingredients pi ON p.id = pi.product_id
+     LEFT JOIN ingredients i ON pi.ingredient_id = i.id
+     GROUP BY p.id, p.name, p.category, p.price
+     ORDER BY p.id DESC`,
+    (err, results) => {
+      if (err) {
+        console.log("COSTING ANALYSIS ERROR:", err);
+        return res.status(500).json([]);
+      }
+
+      const analysis = results.map((item) => {
+        const sellingPrice = Number(item.selling_price || 0);
+        const totalCost = Number(item.total_cost || 0);
+        const profit = sellingPrice - totalCost;
+        const margin = sellingPrice > 0 ? (profit / sellingPrice) * 100 : 0;
+
+        return {
+          id: item.id,
+          name: item.name,
+          category: item.category,
+          selling_price: sellingPrice,
+          total_cost: totalCost,
+          profit: profit,
+          margin: margin
+        };
+      });
+
+      res.json(analysis);
+    }
+  );
 });

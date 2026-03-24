@@ -10,6 +10,7 @@ export default function Admin() {
 
   // Product Form States
   const [name, setName] = useState("");
+  const [category, setCategory] = useState("");
   const [price, setPrice] = useState("");
   const [image, setImage] = useState(null);
 
@@ -42,15 +43,22 @@ export default function Admin() {
 
   /* ================= PRODUCT ACTIONS ================= */
   const addProduct = async () => {
-    if (!name.trim() || !price) return alert("Fill in name and price");
+    if (!name.trim() || !category || !price) {
+      return alert("Fill in name, category, and price");
+    }
+
     const formData = new FormData();
     formData.append("name", name.trim());
+    formData.append("category", category);
     formData.append("price", Number(price));
     if (image) formData.append("image", image);
 
     const res = await fetch(`${API}/api/products`, { method: "POST", body: formData });
     if (res.ok) {
-      setName(""); setPrice(""); setImage(null);
+      setName("");
+      setCategory("");
+      setPrice("");
+      setImage(null);
       fetchProducts();
     }
   };
@@ -88,10 +96,10 @@ export default function Admin() {
       const res = await fetch(`${API}/api/ingredients/${id}/stock`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ change }) // Sends +1 or -1 to backend
+        body: JSON.stringify({ change })
       });
       if (res.ok) {
-        fetchIngredients(); // Refresh list to show new stock
+        fetchIngredients();
       }
     } catch (err) {
       console.error("Update stock error:", err);
@@ -130,6 +138,18 @@ export default function Admin() {
               <div className="card-header"><h2>Product Management</h2></div>
               <div className="form-group">
                 <input placeholder="Product Name" value={name} onChange={(e) => setName(e.target.value)} />
+
+                <select value={category} onChange={(e) => setCategory(e.target.value)}>
+                  <option value="">Select Category</option>
+                  <option value="Coffee Based">Coffee Based</option>
+                  <option value="Non-Coffee Based">Non-Coffee Based</option>
+                  <option value="Matcha Series">Matcha Series</option>
+                  <option value="Chocolate Series">Chocolate Series</option>
+                  <option value="Barista's Choice">Barista's Choice</option>
+                  <option value="Soda">Soda</option>
+                  <option value="Dirty Soda">Dirty Soda</option>
+                </select>
+
                 <input placeholder="Price (₱)" type="number" value={price} onChange={(e) => setPrice(e.target.value)} />
                 <div className="file-input-wrapper">
                    <input type="file" id="prod-img" className="file-input" onChange={(e) => setImage(e.target.files[0])} />
@@ -144,6 +164,7 @@ export default function Admin() {
                     <tr>
                       <th>Preview</th>
                       <th>Product Name</th>
+                      <th>Category</th>
                       <th>Price</th>
                       <th>Actions</th>
                     </tr>
@@ -153,6 +174,7 @@ export default function Admin() {
                       <tr key={p.id}>
                         <td><div className="img-center-wrapper"><img src={p.image ? API + p.image : "/placeholder.png"} className="table-img" /></div></td>
                         <td className="font-bold">{p.name}</td>
+                        <td>{p.category}</td>
                         <td className="price-tag">₱{Number(p.price).toLocaleString()}</td>
                         <td><button className="btn-danger" onClick={() => deleteProduct(p.id)}>Delete</button></td>
                       </tr>
@@ -243,7 +265,7 @@ export default function Admin() {
           justify-content: center; align-items: center;
         }
 
-        input { padding: 10px; border: 1px solid #000; border-radius: 8px; width: 160px; }
+        input, select { padding: 10px; border: 1px solid #000; border-radius: 8px; width: 160px; }
         .btn-primary { background: #6b4f3a; color: white; padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: 700; }
 
         /* BLACK BORDER TABLE STYLES */
@@ -258,44 +280,73 @@ export default function Admin() {
         .table-img { width: 50px; height: 50px; object-fit: cover; border-radius: 8px; border: 1px solid #000; }
         .img-center-wrapper { display: flex; justify-content: center; }
 
-        .stock-control { display: flex; align-items: center; justify-content: center; gap: 10px; }
+        .font-bold { font-weight: 700; color: #4a3728; }
+        .price-tag { font-weight: 700; color: #2e7d32; }
+        .total-val { font-weight: 800; color: #6b4f3a; }
+
+        .btn-danger {
+          background: #b3261e;
+          color: white;
+          padding: 8px 14px;
+          border: none;
+          border-radius: 8px;
+          cursor: pointer;
+          font-weight: 700;
+        }
+
+        .stock-control {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 10px;
+        }
+
         .stock-btn {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%; /* Makes them circular */
-  border: 1.5px solid #000;
-  background: white;
-  color: #000;
-  cursor: pointer;
-  font-weight: bold;
-  font-size: 1.1rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-  line-height: 0; /* Keeps the + and - centered */
-}
+          width: 30px;
+          height: 30px;
+          border: none;
+          border-radius: 50%;
+          background: #6b4f3a;
+          color: white;
+          font-weight: 700;
+          cursor: pointer;
+        }
 
-.stock-btn:hover {
-  background: #000;
-  color: #fff;
-  transform: scale(1.1); /* Slight pop on hover */
-}
+        .stock-val { min-width: 24px; font-weight: 700; }
 
-.stock-val {
-  font-weight: 800;
-  min-width: 40px;
-  font-size: 1.2rem;
-  text-align: center;
-}
-        
-        .btn-danger { background: #ffefef; color: #e55039; border: 1px solid #000; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight: bold; }
-        .inventory-footer { margin-top: 2rem; text-align: center; padding: 1rem; border: 1px solid #000; background: #fff; border-radius: 12px; }
-        
+        .inventory-footer {
+          margin-top: 1.5rem;
+          text-align: right;
+          font-size: 1.1rem;
+          font-weight: 700;
+        }
+
+        .inventory-footer span { color: #2e7d32; }
+
         .file-input { display: none; }
-        .file-input-wrapper label { padding: 9px 15px; background: #fff; border: 1px dashed #000; border-radius: 8px; cursor: pointer; }
+        .file-input-wrapper label {
+          display: inline-block;
+          padding: 10px 16px;
+          background: #6b4f3a;
+          color: white;
+          border-radius: 8px;
+          cursor: pointer;
+          font-weight: 700;
+        }
 
-        @media (max-width: 850px) { .form-group { flex-direction: column; } }
+        @media (max-width: 768px) {
+          .form-group {
+            flex-direction: column;
+          }
+
+          input, select {
+            width: 100%;
+          }
+
+          .table-wrapper {
+            overflow-x: auto;
+          }
+        }
       `}</style>
     </div>
   );
