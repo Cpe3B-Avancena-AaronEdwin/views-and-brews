@@ -1,11 +1,23 @@
 import { useEffect, useState } from "react";
 import Navbar from "./Navbar";
 
-
 const API = "http://localhost:5000";
 
 export default function Menu() {
   const [products, setProducts] = useState([]);
+  const [activeCategory, setActiveCategory] = useState("All");
+
+  // Categories derived from your physical menu flyer
+  const categories = [
+    "All", 
+    "Coffee Based", 
+    "Non-Coffee Based", 
+    "Matcha Series", 
+    "Chocolate Series", 
+    "Barista's Choice", 
+    "Soda",
+    "Dirty Soda"
+  ];
 
   useEffect(() => {
     fetch(`${API}/api/products`)
@@ -13,169 +25,238 @@ export default function Menu() {
       .then(setProducts);
   }, []);
 
+  // Filter logic
+  const filteredProducts = activeCategory === "All" 
+    ? products 
+    : products.filter(p => p.category === activeCategory);
+
   return (
-    <div className="menu-container">
+    <div className="page-wrapper">
       <Navbar />
 
-      <header className="menu-header">
-        <h1>Our Coffee Selection</h1>
-        <p>Freshly brewed, just for you.</p>
-      </header>
+      <div className="content-spacing">
+        <div className="main-content-card">
+          <header className="menu-header">
+            <span className="subtitle">Premium Selection</span>
+            <h1>Our Coffee Selection</h1>
+            <div className="header-line"></div>
+            
+            {/* --- CATEGORY BUTTONS --- */}
+            <div className="category-container">
+              {categories.map((cat) => (
+                <button
+                  key={cat}
+                  className={`cat-btn ${activeCategory === cat ? "active" : ""}`}
+                  onClick={() => setActiveCategory(cat)}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+          </header>
 
-      <main className="product-grid">
-        {products.map((p) => (
-          <div key={p.id} className="product-card">
-            <div className="image-container">
-              <img
-                src={p.image ? API + p.image : "/placeholder.png"}
-                alt={p.name}
-              />
-            </div>
-            <div className="product-info">
-              <h3>{p.name}</h3>
-              <p className="price">₱{Number(p.price).toLocaleString()}</p>
-              
-              {/* --- NEW DESCRIPTION ELEMENT --- */}
-              <p className="description">{p.description || "A delicious blend of premium beans."}</p>
-              
-              <button className="order-btn">Add to Order</button>
-            </div>
-          </div>
-        ))}
-      </main>
+          <main className="product-grid">
+            {filteredProducts.map((p) => (
+              <div key={p.id} className="product-card">
+                <div className="image-container">
+                  <img
+                    src={p.image ? API + p.image : "/placeholder.png"}
+                    alt={p.name}
+                  />
+                </div>
+                <div className="product-info">
+                  <h3>{p.name}</h3>
+                  <p className="price">₱{Number(p.price).toLocaleString()}</p>
+                  <p className="description">
+                    {p.description || "A delicious blend of premium ingredients."}
+                  </p>
+                  <button className="order-btn">Add to Order</button>
+                </div>
+              </div>
+            ))}
+          </main>
+          
+          {filteredProducts.length === 0 && (
+            <p className="no-products">No items found in this category.</p>
+          )}
+        </div>
+      </div>
 
       <style jsx>{`
-        .menu-container {
-          background-color: #fff7f0;
+        .page-wrapper {
+          background-color: #f8f1ea;
+          background-image: radial-gradient(#dccbb5 0.5px, transparent 0.5px);
+          background-size: 20px 20px;
           min-height: 100vh;
-          font-family: 'Inter', sans-serif;
-          padding-bottom: 60px;
+          font-family: 'Inter', -apple-system, sans-serif;
+        }
+
+        .content-spacing {
+          padding: 80px 20px; /* Large top padding to clear the Navbar */
+          display: flex;
+          justify-content: center;
+        }
+
+        .main-content-card {
+          width: 100%;
+          max-width: 1200px;
+          background: rgba(255, 255, 255, 0.95);
+          backdrop-filter: blur(10px);
+          border-radius: 30px;
+          box-shadow: 0 20px 60px rgba(74, 55, 40, 0.12);
+          padding: 60px 40px;
+          border: 1px solid rgba(255, 255, 255, 0.6);
         }
 
         .menu-header {
           text-align: center;
-          padding: 50px 20px 30px;
-          color: #4a3728;
+          margin-bottom: 40px;
+        }
+
+        .subtitle {
+          text-transform: uppercase;
+          letter-spacing: 2px;
+          font-size: 0.8rem;
+          font-weight: 700;
+          color: #bc8a5f;
         }
 
         .menu-header h1 {
-          font-size: 2.8rem;
-          margin: 0;
-          font-weight: 800;
-          letter-spacing: -1px;
+          font-size: 3rem;
+          margin: 10px 0;
+          font-weight: 900;
+          color: #2d241e;
         }
 
-        .product-grid {
+        .header-line {
+          width: 50px;
+          height: 3px;
+          background: #bc8a5f;
+          margin: 15px auto 30px;
+        }
+
+        /* CATEGORY STYLES */
+        .category-container {
           display: flex;
           flex-wrap: wrap;
           justify-content: center;
-          gap: 25px;
-          max-width: 1300px;
-          margin: 0 auto;
-          padding: 0 20px;
+          gap: 10px;
+          margin-bottom: 20px;
+        }
+
+        .cat-btn {
+          padding: 8px 20px;
+          border-radius: 20px;
+          border: 1px solid #dccbb5;
+          background: white;
+          color: #6b5a4c;
+          font-weight: 600;
+          font-size: 0.85rem;
+          cursor: pointer;
+          transition: all 0.3s ease;
+        }
+
+        .cat-btn:hover {
+          background: #fdf8f4;
+          border-color: #bc8a5f;
+        }
+
+        .cat-btn.active {
+          background: #2d241e;
+          color: white;
+          border-color: #2d241e;
+          box-shadow: 0 4px 12px rgba(45, 36, 30, 0.2);
+        }
+
+        /* GRID & CARDS */
+        .product-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+          gap: 30px;
         }
 
         .product-card {
           background: #ffffff;
-          border: 1.5px solid #000;
-          width: calc(20% - 25px);
-          min-width: 200px;
-          border-radius: 12px;
+          border-radius: 20px;
           overflow: hidden;
-          transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+          transition: all 0.4s ease;
           display: flex;
           flex-direction: column;
-          cursor: pointer;
-          position: relative; /* Ensure z-index works correctly */
+          border: 1px solid #f0f0f0;
         }
 
         .product-card:hover {
-          transform: scale(1.12);
-          z-index: 10;
-          box-shadow: 0 25px 50px rgba(0,0,0,0.15);
-          border-color: #6b4f3a;
-        }
-
-        /* --- DESCRIPTION LOGIC --- */
-        .description {
-          font-size: 0.85rem;
-          color: #666;
-          margin: 0;
-          max-height: 0; /* Hidden by default */
-          opacity: 0;    /* Hidden by default */
-          overflow: hidden;
-          transition: all 0.3s ease; /* Smooth slide down */
-          line-height: 1.4;
-        }
-
-        .product-card:hover .description {
-          max-height: 80px; /* Adjust based on your text length */
-          opacity: 1;
-          margin-top: 5px;
-          margin-bottom: 10px;
+          transform: translateY(-8px);
+          box-shadow: 0 15px 30px rgba(0,0,0,0.08);
         }
 
         .image-container {
           width: 100%;
-          height: 180px;
-          border-bottom: 1px solid #000;
-          overflow: hidden;
-          background: #fdfdfd;
+          height: 200px;
+          background: #fafafa;
         }
 
         .image-container img {
           width: 100%;
           height: 100%;
           object-fit: cover;
-          transition: transform 0.6s ease;
         }
 
         .product-info {
-          padding: 15px;
+          padding: 20px;
           text-align: center;
-          display: flex;
-          flex-direction: column;
-          gap: 5px;
           flex-grow: 1;
         }
 
         .product-info h3 {
-          margin: 0;
-          font-size: 1.15rem;
-          color: #2d2d2d;
-          font-weight: 700;
+          margin: 0 0 5px 0;
+          font-size: 1.1rem;
+          color: #2d241e;
         }
 
         .price {
           font-size: 1.2rem;
           font-weight: 800;
-          color: #6b4f3a;
-          margin: 0;
+          color: #bc8a5f;
+          margin-bottom: 10px;
+        }
+
+        .description {
+          font-size: 0.85rem;
+          color: #888;
+          margin-bottom: 15px;
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
         }
 
         .order-btn {
-          background: #000;
-          color: #fff;
+          width: 100%;
+          background: #2d241e;
+          color: white;
           border: none;
           padding: 10px;
-          border-radius: 8px;
-          font-weight: 700;
-          font-size: 0.85rem;
+          border-radius: 10px;
+          font-weight: 600;
           cursor: pointer;
-          transition: 0.3s;
-          margin-top: auto;
+          transition: background 0.3s;
         }
 
         .order-btn:hover {
-          background: #6b4f3a;
-          transform: translateY(-2px);
+          background: #bc8a5f;
         }
 
-        /* RESPONSIVE SCALING */
-        @media (max-width: 1150px) { .product-card { width: calc(25% - 25px); } }
-        @media (max-width: 900px) { .product-card { width: calc(33.33% - 25px); } }
-        @media (max-width: 650px) { .product-card { width: calc(50% - 25px); } }
-        @media (max-width: 450px) { .product-card { width: 100%; } }
+        .no-products {
+          text-align: center;
+          color: #888;
+          padding: 40px;
+        }
+
+        @media (max-width: 768px) {
+          .main-content-card { padding: 40px 20px; }
+          .menu-header h1 { font-size: 2.2rem; }
+        }
       `}</style>
     </div>
   );
