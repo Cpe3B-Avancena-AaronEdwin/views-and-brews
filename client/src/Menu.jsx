@@ -1,20 +1,21 @@
 import { useEffect, useState } from "react";
 import Navbar from "./Navbar";
+import Sidebar from "./Sidebar";
 
 const API = "http://localhost:5000";
 
 export default function Menu() {
   const [products, setProducts] = useState([]);
   const [activeCategory, setActiveCategory] = useState("All");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // Categories derived from your physical menu flyer
   const categories = [
-    "All", 
-    "Coffee Based", 
-    "Non-Coffee Based", 
-    "Matcha Series", 
-    "Chocolate Series", 
-    "Barista's Choice", 
+    "All",
+    "Coffee Based",
+    "Non-Coffee Based",
+    "Matcha Series",
+    "Chocolate Series",
+    "Barista's Choice",
     "Soda",
     "Dirty Soda"
   ];
@@ -25,14 +26,14 @@ export default function Menu() {
       .then(setProducts);
   }, []);
 
-  // Filter logic
-  const filteredProducts = activeCategory === "All" 
-    ? products 
+  const filteredProducts = activeCategory === "All"
+    ? products
     : products.filter(p => p.category === activeCategory);
 
   return (
     <div className="page-wrapper">
-      <Navbar />
+      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <Navbar onMenuClick={() => setSidebarOpen(true)} />
 
       <div className="content-spacing">
         <div className="main-content-card">
@@ -40,8 +41,7 @@ export default function Menu() {
             <span className="subtitle">Premium Selection</span>
             <h1>Our Coffee Selection</h1>
             <div className="header-line"></div>
-            
-            {/* --- CATEGORY BUTTONS --- */}
+
             <div className="category-container">
               {categories.map((cat) => (
                 <button
@@ -75,14 +75,14 @@ export default function Menu() {
               </div>
             ))}
           </main>
-          
+
           {filteredProducts.length === 0 && (
             <p className="no-products">No items found in this category.</p>
           )}
         </div>
       </div>
 
-      <style jsx>{`
+      <style>{`
         .page-wrapper {
           background-color: #f8f1ea;
           background-image: radial-gradient(#dccbb5 0.5px, transparent 0.5px);
@@ -92,7 +92,7 @@ export default function Menu() {
         }
 
         .content-spacing {
-          padding: 80px 20px; /* Large top padding to clear the Navbar */
+          padding: 80px 20px;
           display: flex;
           justify-content: center;
         }
@@ -135,7 +135,6 @@ export default function Menu() {
           margin: 15px auto 30px;
         }
 
-        /* CATEGORY STYLES */
         .category-container {
           display: flex;
           flex-wrap: wrap;
@@ -168,7 +167,6 @@ export default function Menu() {
           box-shadow: 0 4px 12px rgba(45, 36, 30, 0.2);
         }
 
-        /* GRID & CARDS */
         .product-grid {
           display: grid;
           grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
