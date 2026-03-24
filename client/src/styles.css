@@ -4,23 +4,22 @@ body {
   color: #111111;
   margin: 0;
   padding: 0;
-  
 }
 
 h2 {
-  color: #2f2a26; /* brown */
+  color: #6b4f3a; /* brown */
   text-align: center;
 }
 
 table {
   border-collapse: collapse;
   width: 80%;
-  margin: 0;
+  margin: 20px auto;
 }
 
 th, td {
-  padding: 0;
-  border: 1px solid #a07f66;
+  padding: 10px;
+  border: 1px solid #6b4f3a;
   text-align: center;
 }
 
@@ -39,102 +38,4 @@ button {
 
 button:hover {
   background-color: #a67c52;
-}
-/* Sidebar styling */
-.sidebar {
-  position: fixed;
-  left: 0;
-  top: 0;
-  width: 250px;
-  height: 100vh;
-  background-color: #6b4f3a;
-  color: #fff;
-  padding: 2rem 1rem;
-  flex-direction: column;
-  align-items: center;
-  transition: left 0.3s ease;
-  z-index: 999;
-  overflow-y: auto;
-  margin: 0;
-}
-
-.sidebar img.profile-pic {
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  margin-bottom: 2rem;
-  object-fit: cover;
-}
-
-.sidebar a,
-.sidebar button {
-  width: 100%;
-  padding: 0.8rem;
-  margin-bottom: 1rem;
-  text-align: center;
-  background-color: #301a0c;
-  color: #fff;
-  border-radius: 5px;
-  border: none;
-  font-weight: bold;
-  cursor: pointer;
-  text-decoration: none;
-}
-/* Sidebar buttons hover effect */
-.sidebar a:hover,
-.sidebar button:hover {
-  transform: scale(1.1); /* 10% bigger on hover */
-  background-color: #555; /* optional: slightly lighter background */
-}
-
-/* Make the transition smooth */
-.sidebar a,
-.sidebar button {
-  transition: transform 0.2s ease, background-color 0.2s ease;
-}
-/* Hamburger button */
-.hamburger-btn {
-  position: fixed;
-  top: 10px;
-  left: 10px;
-  z-index: 1001;
-  font-size: 2rem;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  color: #302417;
-}
-
-
-form input {
-  width: 100%;
-  max-width: 100%;
-  box-sizing: border-box;
-}
-
-/* Make Signup submit button match sidebar buttons */
-form button {
-  background-color: #6b4f3a; /* same brown as sidebar */
-  color: #fff;
-  font-weight: bold;
-  border-radius: 5px; /* match sidebar button radius */
-  padding: 0.8rem 1rem;
-  font-size: 1rem;
-  transition: transform 0.2s ease, background-color 0.2s ease;
-}
-
-/* Hover effect like sidebar buttons */
-form button:hover {
-  transform: scale(1.05);
-  background-color: #a67c52; /* lighter brown on hover */
-}
-
-/* Optional: hover effect on inputs for focus consistency */
-form input:focus {
-  border-color: #6b4f3a; /* brown instead of blue */
-  box-shadow: 0 0 5px rgba(107, 79, 58, 0.5);
-}
-
-p {
-  color: #6b4f3a;
 }
