@@ -284,7 +284,29 @@ export default function Admin() {
       console.error("Delete recipe ingredient error:", err);
     }
   };
+const getStockStatus = (stock, unit) => {
+  const value = Number(stock);
 
+  if (unit === "pcs") {
+    if (value <= 5) return { label: "Low", color: "#b3261e", bg: "#fdecea" };
+    if (value <= 10) return { label: "Medium", color: "#b26a00", bg: "#fff4db" };
+    return { label: "Good", color: "#2e7d32", bg: "#eaf7ee" };
+  }
+
+  if (unit === "mL" || unit === "g") {
+    if (value <= 200) return { label: "Low", color: "#b3261e", bg: "#fdecea" };
+    if (value <= 500) return { label: "Medium", color: "#b26a00", bg: "#fff4db" };
+    return { label: "Good", color: "#2e7d32", bg: "#eaf7ee" };
+  }
+
+  if (unit === "L" || unit === "kg") {
+    if (value <= 1) return { label: "Low", color: "#b3261e", bg: "#fdecea" };
+    if (value <= 3) return { label: "Medium", color: "#b26a00", bg: "#fff4db" };
+    return { label: "Good", color: "#2e7d32", bg: "#eaf7ee" };
+  }
+
+  return { label: "Good", color: "#2e7d32", bg: "#eaf7ee" };
+};
 return (
   <div className="admin-container">
     <Navbar onMenuClick={() => setSidebarOpen(true)} />
@@ -296,6 +318,28 @@ return (
           <p>Manage your inventory and products seamlessly.</p>
 
           <nav className="tab-navigation">
+<button
+  onClick={async () => {
+    const res = await fetch("http://localhost:5000/api/orders", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        items: [{ product_id: 18, quantity: 1 }]
+      })
+    });
+
+    const data = await res.json();
+    alert(data.message);
+
+    // ✅ REFRESH DATA HERE
+    fetchIngredients();
+    fetchCostingAnalysis();
+  }}
+>
+  Test Order
+</button>
             <button
               className={tab === "products" ? "nav-btn active" : "nav-btn"}
               onClick={() => setTab("products")}
@@ -410,6 +454,12 @@ return (
               <div className="card-header"><h2>Ingredients Inventory</h2></div>
 
               <div className="form-group">
+                <div className="alert-summary">
+  <h3>Low Stock Alerts</h3>
+  <p>
+    {ingredients.filter((i) => getStockStatus(i.stock, i.unit).label === "Low").length} low stock item(s)
+  </p>
+</div>
                 <input
                   placeholder="Ingredient Name"
                   value={ingredientName}
@@ -447,51 +497,101 @@ return (
                 <table className="black-border-table">
                   <thead>
                     <tr>
-                      <th>Ingredient</th>
-                      <th>Unit</th>
-                      <th>Current Stock</th>
-                      <th>Unit Price</th>
-                      <th>Total Value</th>
-                      <th>Actions</th>
+<th>Ingredient</th>
+<th>Unit</th>
+<th>Current Stock</th>
+<th>Status</th>
+<th>Unit Price</th>
+<th>Total Value</th>
+<th>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {ingredients.map((i) => (
-                      <tr key={i.id}>
-                        <td className="font-bold">{i.name}</td>
-                        <td>{i.unit}</td>
-                        <td>
-                          <div className="stock-with-unit">
-                            <div className="stock-control">
-                              <button
-                                onClick={() => updateStock(i.id, -1, i.unit)}
-                                className="stock-btn"
-                              >
-                                -
-                              </button>
-                              <span className="stock-val">{i.stock}</span>
-                              <button
-                                onClick={() => updateStock(i.id, 1, i.unit)}
-                                className="stock-btn"
-                              >
-                                +
-                              </button>
-                            </div>
-                            <span className="unit-label">{i.unit}</span>
-                          </div>
-                        </td>
-                        <td className="price-tag">₱{i.price} / {i.unit}</td>
-                        <td className="total-val">₱{(i.stock * i.price).toLocaleString()}</td>
-                        <td>
-                          <button className="btn-danger" onClick={() => deleteIngredient(i.id)}>
-                            Delete
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+{ingredients.map((i) => {
+  const stockStatus = getStockStatus(i.stock, i.unit); // ✅ VALID HERE
+const profitInsights = (() => {
+  if (!costingAnalysis.length) {
+    return {
+      topProfit: null,
+      lowProfit: null,
+      topMargin: null,
+      avgProfit: 0,
+      avgMargin: 0
+    };
+  }
+
+  const topProfit = [...costingAnalysis].sort((a, b) => b.profit - a.profit)[0];
+  const lowProfit = [...costingAnalysis].sort((a, b) => a.profit - b.profit)[0];
+  const topMargin = [...costingAnalysis].sort((a, b) => b.margin - a.margin)[0];
+
+  const avgProfit =
+    costingAnalysis.reduce((sum, item) => sum + Number(item.profit || 0), 0) /
+    costingAnalysis.length;
+
+  const avgMargin =
+    costingAnalysis.reduce((sum, item) => sum + Number(item.margin || 0), 0) /
+    costingAnalysis.length;
+
+  return {
+    topProfit,
+    lowProfit,
+    topMargin,
+    avgProfit,
+    avgMargin
+  };
+})();
+  return (
+    <tr key={i.id}>
+      <td className="font-bold">{i.name}</td>
+      <td>{i.unit}</td>
+
+      <td>
+        <div className="stock-with-unit">
+          <div className="stock-control">
+            <button
+              onClick={() => updateStock(i.id, -10, i.unit)}
+              className="stock-btn"
+            >
+              -
+            </button>
+            <span className="stock-val">{i.stock}</span>
+            <button
+              onClick={() => updateStock(i.id, 10, i.unit)}
+              className="stock-btn"
+            >
+              +
+            </button>
+          </div>
+          <span className="unit-label">{i.unit}</span>
+        </div>
+      </td>
+
+      <td>
+        <span
+          className="status-badge"
+          style={{
+            color: stockStatus.color,
+            backgroundColor: stockStatus.bg
+          }}
+        >
+          {stockStatus.label}
+        </span>
+      </td>
+
+      <td className="price-tag">₱{i.price} / {i.unit}</td>
+      <td className="total-val">₱{(i.stock * i.price).toLocaleString()}</td>
+
+      <td>
+        <button className="btn-danger" onClick={() => deleteIngredient(i.id)}>
+          Delete
+        </button>
+      </td>
+    </tr>
+  );
+})}
                     {ingredients.length === 0 && (
                       <tr>
-                        <td colSpan="6">No ingredients yet.</td>
+                        <td colSpan="7">No ingredients yet.</td>
                       </tr>
                     )}
                   </tbody>
@@ -510,7 +610,7 @@ return (
           ) : (
             <div className="glass-card">
               <div className="card-header"><h2>Cost Analysis</h2></div>
-
+              
               <div className="form-group">
                 <select
                   value={selectedProductId}
@@ -669,6 +769,31 @@ return (
       </main>
 
       <style jsx>{`
+      .alert-summary {
+  margin-bottom: 1.5rem;
+  padding: 1rem 1.2rem;
+  border: 1px solid #000;
+  border-radius: 12px;
+  background: #fff8f2;
+}
+
+.alert-summary h3 {
+  margin: 0 0 6px 0;
+  color: #6b4f3a;
+}
+
+.alert-summary p {
+  margin: 0;
+  font-weight: 700;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
         .admin-container {
           background-color: #fff7f0;
           //background-image: url("/background.jpg"); BACKGROUND
