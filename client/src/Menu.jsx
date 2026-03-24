@@ -32,8 +32,7 @@ export default function Menu() {
 
   return (
     <div className="page-wrapper">
-      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-      <Navbar onMenuClick={() => setSidebarOpen(true)} />
+
 
       <div className="content-spacing">
         <div className="main-content-card">
@@ -84,7 +83,7 @@ export default function Menu() {
 
       <style>{`
         .page-wrapper {
-          background-color: #f8f1ea;
+          background-color: #fff7f0;
           background-image: radial-gradient(#dccbb5 0.5px, transparent 0.5px);
           background-size: 20px 20px;
           min-height: 100vh;

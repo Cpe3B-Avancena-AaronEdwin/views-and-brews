@@ -9,6 +9,7 @@ import jwt from "jsonwebtoken";
 
 import dotenv from "dotenv";
 dotenv.config();
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -21,11 +22,11 @@ const db = mysql.createConnection({
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME
 });
-db.connect(err => {
+
+db.connect((err) => {
   if (err) console.log("DB ERROR:", err);
   else console.log("MySQL Connected");
 });
-
 
 /* ================= IMAGE UPLOAD ================= */
 
@@ -55,8 +56,9 @@ app.post("/api/login", (req, res) => {
     [username, password],
     (err, results) => {
       if (err) return res.status(500).json({ success: false });
-      if (results.length === 0)
+      if (results.length === 0) {
         return res.status(401).json({ success: false });
+      }
 
       res.json({ success: true });
     }
@@ -79,7 +81,6 @@ app.post("/api/products", upload.single("image"), (req, res) => {
     console.log("BODY:", req.body);
     console.log("FILE:", req.file);
 
-    // Validation
     if (!name || !category || !price) {
       return res.status(400).json({
         success: false,
@@ -95,14 +96,12 @@ app.post("/api/products", upload.single("image"), (req, res) => {
       });
     }
 
-    const image = req.file
-      ? `/uploads/${req.file.filename}`
-      : null;
+    const image = req.file ? `/uploads/${req.file.filename}` : null;
 
     db.query(
       "INSERT INTO products (name, category, price, image) VALUES (?, ?, ?, ?)",
       [name, category, numericPrice, image],
-      (err, result) => {
+      (err) => {
         if (err) {
           console.log("INSERT ERROR:", err);
           return res.status(500).json({
@@ -117,7 +116,6 @@ app.post("/api/products", upload.single("image"), (req, res) => {
         });
       }
     );
-
   } catch (error) {
     console.log("SERVER ERROR:", error);
     res.status(500).json({
@@ -127,9 +125,29 @@ app.post("/api/products", upload.single("image"), (req, res) => {
   }
 });
 
+app.delete("/api/products/:id", (req, res) => {
+  db.query(
+    "DELETE FROM products WHERE id = ?",
+    [req.params.id],
+    (err) => {
+      if (err) {
+        console.log("DELETE PRODUCT ERROR:", err);
+        return res.status(500).json({
+          success: false,
+          message: "Database delete failed"
+        });
+      }
+
+      res.json({
+        success: true,
+        message: "Product deleted successfully"
+      });
+    }
+  );
+});
+
 /* ================= INGREDIENTS ================= */
 
-// get all
 app.get("/api/ingredients", (req, res) => {
   db.query("SELECT * FROM ingredients ORDER BY id DESC", (err, results) => {
     if (err) return res.status(500).json([]);
@@ -137,20 +155,19 @@ app.get("/api/ingredients", (req, res) => {
   });
 });
 
-// add ingredient
 app.post("/api/ingredients", (req, res) => {
-  const { name, stock, price } = req.body;
+  const { name, unit, stock, price } = req.body;
 
-  if (!name || stock === undefined || price === undefined) {
+  if (!name || !unit || stock === undefined || price === undefined) {
     return res.status(400).json({ message: "Missing fields" });
   }
 
   db.query(
-    "INSERT INTO ingredients (name, stock, price) VALUES (?, ?, ?)",
-    [name, Number(stock), Number(price)],
-    err => {
+    "INSERT INTO ingredients (name, unit, stock, price) VALUES (?, ?, ?, ?)",
+    [name, unit, Number(stock), Number(price)],
+    (err) => {
       if (err) {
-        console.log(err);
+        console.log("ADD INGREDIENT ERROR:", err);
         return res.status(500).json({ message: "Database error" });
       }
       res.json({ success: true });
@@ -158,35 +175,151 @@ app.post("/api/ingredients", (req, res) => {
   );
 });
 
-// delete ingredient
 app.delete("/api/ingredients/:id", (req, res) => {
   db.query(
     "DELETE FROM ingredients WHERE id=?",
     [req.params.id],
-    err => {
+    (err) => {
       if (err) return res.status(500).json({ success: false });
       res.json({ success: true });
     }
   );
 });
 
-// change stock (+ / -)
 app.put("/api/ingredients/:id/stock", (req, res) => {
   const { change } = req.body;
 
   db.query(
     "UPDATE ingredients SET stock = stock + ? WHERE id=?",
     [change, req.params.id],
-    err => {
+    (err) => {
       if (err) return res.status(500).json({ success: false });
       res.json({ success: true });
     }
   );
 });
 
-/* ================= START ================= */
+/* ================= PRODUCT INGREDIENTS / COSTING ================= */
 
-app.listen(5000, () => console.log("Server running on port 5000"));
+app.get("/api/products/:id/ingredients", (req, res) => {
+  db.query(
+    `SELECT 
+      pi.id,
+      pi.product_id,
+      pi.ingredient_id,
+      pi.quantity,
+      i.name AS ingredient_name,
+      i.unit AS ingredient_unit,
+      i.price AS ingredient_price,
+      i.stock AS ingredient_stock
+     FROM product_ingredients pi
+     JOIN ingredients i ON pi.ingredient_id = i.id
+     WHERE pi.product_id = ?
+     ORDER BY pi.id DESC`,
+    [req.params.id],
+    (err, results) => {
+      if (err) {
+        console.log("GET PRODUCT INGREDIENTS ERROR:", err);
+        return res.status(500).json([]);
+      }
+      res.json(results);
+    }
+  );
+});
+
+app.post("/api/products/:id/ingredients", (req, res) => {
+  const { ingredient_id, quantity } = req.body;
+
+  if (!ingredient_id || quantity === undefined) {
+    return res.status(400).json({
+      success: false,
+      message: "ingredient_id and quantity are required"
+    });
+  }
+
+  const numericQuantity = parseFloat(quantity);
+
+  if (isNaN(numericQuantity) || numericQuantity <= 0) {
+    return res.status(400).json({
+      success: false,
+      message: "Quantity must be a valid number greater than 0"
+    });
+  }
+
+  db.query(
+    "INSERT INTO product_ingredients (product_id, ingredient_id, quantity) VALUES (?, ?, ?)",
+    [req.params.id, ingredient_id, numericQuantity],
+    (err) => {
+      if (err) {
+        console.log("ADD PRODUCT INGREDIENT ERROR:", err);
+        return res.status(500).json({
+          success: false,
+          message: "Database error"
+        });
+      }
+
+      res.json({
+        success: true,
+        message: "Ingredient added to product recipe"
+      });
+    }
+  );
+});
+
+app.delete("/api/product-ingredients/:id", (req, res) => {
+  db.query(
+    "DELETE FROM product_ingredients WHERE id = ?",
+    [req.params.id],
+    (err) => {
+      if (err) {
+        console.log("DELETE PRODUCT INGREDIENT ERROR:", err);
+        return res.status(500).json({ success: false });
+      }
+      res.json({ success: true });
+    }
+  );
+});
+
+app.get("/api/costing-analysis", (req, res) => {
+  db.query(
+    `SELECT
+      p.id,
+      p.name,
+      p.category,
+      p.price AS selling_price,
+      IFNULL(SUM(pi.quantity * i.price), 0) AS total_cost
+     FROM products p
+     LEFT JOIN product_ingredients pi ON p.id = pi.product_id
+     LEFT JOIN ingredients i ON pi.ingredient_id = i.id
+     GROUP BY p.id, p.name, p.category, p.price
+     ORDER BY p.id DESC`,
+    (err, results) => {
+      if (err) {
+        console.log("COSTING ANALYSIS ERROR:", err);
+        return res.status(500).json([]);
+      }
+
+      const analysis = results.map((item) => {
+        const sellingPrice = Number(item.selling_price || 0);
+        const totalCost = Number(item.total_cost || 0);
+        const profit = sellingPrice - totalCost;
+        const margin = sellingPrice > 0 ? (profit / sellingPrice) * 100 : 0;
+
+        return {
+          id: item.id,
+          name: item.name,
+          category: item.category,
+          selling_price: sellingPrice,
+          total_cost: totalCost,
+          profit,
+          margin
+        };
+      });
+
+      res.json(analysis);
+    }
+  );
+});
 
 /* ================= CLIENT SIGNUP ================= */
 
@@ -194,17 +327,18 @@ app.post("/api/signup", async (req, res) => {
   const { full_name, email, password, phone, address } = req.body;
 
   if (!full_name || !email || !password) {
-    return res.status(400).json({ message: "Full name, email, and password are required." });
+    return res.status(400).json({
+      message: "Full name, email, and password are required."
+    });
   }
 
   try {
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
     db.query(
       "INSERT INTO users (full_name, email, password_hash, phone, address) VALUES (?, ?, ?, ?, ?)",
       [full_name, email, hashedPassword, phone, address],
-      (err, result) => {
+      (err) => {
         if (err) {
           if (err.code === "ER_DUP_ENTRY") {
             return res.status(400).json({ message: "Email already registered." });
@@ -237,7 +371,6 @@ app.post("/api/client-login", (req, res) => {
     const match = await bcrypt.compare(password, user.password_hash);
     if (!match) return res.status(400).json({ message: "Incorrect password." });
 
-    // Generate JWT token
     const token = jwt.sign(
       { id: user.id, email: user.email },
       "YOUR_SECRET_KEY",
@@ -305,135 +438,17 @@ app.get("/api/client-data", (req, res) => {
       [decoded.id],
       (err, results) => {
         if (err) return res.status(500).json({ message: "Database error" });
-        if (results.length === 0)
+        if (results.length === 0) {
           return res.status(404).json({ message: "User not found" });
+        }
 
         res.json(results[0]);
       }
     );
   });
 });
-/* ================= PRODUCT INGREDIENTS / COSTING ================= */
 
-// get all recipe ingredients for one product
-app.get("/api/products/:id/ingredients", (req, res) => {
-  db.query(
-    `SELECT 
-      pi.id,
-      pi.product_id,
-      pi.ingredient_id,
-      pi.quantity,
-      i.name AS ingredient_name,
-      i.price AS ingredient_price,
-      i.stock AS ingredient_stock
-     FROM product_ingredients pi
-     JOIN ingredients i ON pi.ingredient_id = i.id
-     WHERE pi.product_id = ?
-     ORDER BY pi.id DESC`,
-    [req.params.id],
-    (err, results) => {
-      if (err) {
-        console.log("GET PRODUCT INGREDIENTS ERROR:", err);
-        return res.status(500).json([]);
-      }
-      res.json(results);
-    }
-  );
-});
+/* ================= START ================= */
 
-// add ingredient to a product recipe
-app.post("/api/products/:id/ingredients", (req, res) => {
-  const { ingredient_id, quantity } = req.body;
-
-  if (!ingredient_id || quantity === undefined) {
-    return res.status(400).json({
-      success: false,
-      message: "ingredient_id and quantity are required"
-    });
-  }
-
-  const numericQuantity = parseFloat(quantity);
-
-  if (isNaN(numericQuantity) || numericQuantity <= 0) {
-    return res.status(400).json({
-      success: false,
-      message: "Quantity must be a valid number greater than 0"
-    });
-  }
-
-  db.query(
-    "INSERT INTO product_ingredients (product_id, ingredient_id, quantity) VALUES (?, ?, ?)",
-    [req.params.id, ingredient_id, numericQuantity],
-    (err, result) => {
-      if (err) {
-        console.log("ADD PRODUCT INGREDIENT ERROR:", err);
-        return res.status(500).json({
-          success: false,
-          message: "Database error"
-        });
-      }
-
-      res.json({
-        success: true,
-        message: "Ingredient added to product recipe"
-      });
-    }
-  );
-});
-
-// delete one ingredient from a product recipe
-app.delete("/api/product-ingredients/:id", (req, res) => {
-  db.query(
-    "DELETE FROM product_ingredients WHERE id = ?",
-    [req.params.id],
-    (err) => {
-      if (err) {
-        console.log("DELETE PRODUCT INGREDIENT ERROR:", err);
-        return res.status(500).json({ success: false });
-      }
-      res.json({ success: true });
-    }
-  );
-});
-
-// costing analysis for all products
-app.get("/api/costing-analysis", (req, res) => {
-  db.query(
-    `SELECT
-      p.id,
-      p.name,
-      p.category,
-      p.price AS selling_price,
-      IFNULL(SUM(pi.quantity * i.price), 0) AS total_cost
-     FROM products p
-     LEFT JOIN product_ingredients pi ON p.id = pi.product_id
-     LEFT JOIN ingredients i ON pi.ingredient_id = i.id
-     GROUP BY p.id, p.name, p.category, p.price
-     ORDER BY p.id DESC`,
-    (err, results) => {
-      if (err) {
-        console.log("COSTING ANALYSIS ERROR:", err);
-        return res.status(500).json([]);
-      }
-
-      const analysis = results.map((item) => {
-        const sellingPrice = Number(item.selling_price || 0);
-        const totalCost = Number(item.total_cost || 0);
-        const profit = sellingPrice - totalCost;
-        const margin = sellingPrice > 0 ? (profit / sellingPrice) * 100 : 0;
-
-        return {
-          id: item.id,
-          name: item.name,
-          category: item.category,
-          selling_price: sellingPrice,
-          total_cost: totalCost,
-          profit: profit,
-          margin: margin
-        };
-      });
-
-      res.json(analysis);
-    }
-  );
-});
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

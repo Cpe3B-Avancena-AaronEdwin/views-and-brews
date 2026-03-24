@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
 import Navbar from "./Navbar";
-
+import Sidebar from "./Sidebar";
 const API = "http://localhost:5000";
 
 export default function Admin() {
   const [tab, setTab] = useState("products");
   const [products, setProducts] = useState([]);
   const [ingredients, setIngredients] = useState([]);
-
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   // Product Form States
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
@@ -16,8 +16,46 @@ export default function Admin() {
 
   // Ingredient Form States
   const [ingredientName, setIngredientName] = useState("");
+  const [ingUnit, setIngUnit] = useState("pcs");
   const [stock, setStock] = useState("");
   const [ingPrice, setIngPrice] = useState("");
+
+  // Costing Analysis States
+  const [selectedProductId, setSelectedProductId] = useState("");
+  const [selectedIngredientId, setSelectedIngredientId] = useState("");
+  const [recipeQuantity, setRecipeQuantity] = useState("");
+  const [recipeInputUnit, setRecipeInputUnit] = useState("");
+  const [productRecipe, setProductRecipe] = useState([]);
+  const [costingAnalysis, setCostingAnalysis] = useState([]);
+
+  /* ================= HELPERS ================= */
+  const getIngredientById = (id) => {
+    return ingredients.find((i) => String(i.id) === String(id));
+  };
+
+  const getRecipeUnitOptions = (ingredientUnit) => {
+    if (ingredientUnit === "L" || ingredientUnit === "mL") return ["mL", "L"];
+    if (ingredientUnit === "kg" || ingredientUnit === "g") return ["g", "kg"];
+    return ["pcs"];
+  };
+
+  const convertToBaseUnit = (quantity, fromUnit, toUnit) => {
+    const qty = Number(quantity);
+
+    if (isNaN(qty)) return null;
+    if (fromUnit === toUnit) return qty;
+
+    // volume
+    if (fromUnit === "mL" && toUnit === "L") return qty / 1000;
+    if (fromUnit === "L" && toUnit === "mL") return qty * 1000;
+
+    // weight
+    if (fromUnit === "g" && toUnit === "kg") return qty / 1000;
+    if (fromUnit === "kg" && toUnit === "g") return qty * 1000;
+
+    // incompatible
+    return null;
+  };
 
   /* ================= FETCH LOGIC ================= */
   const fetchProducts = async () => {
@@ -25,7 +63,9 @@ export default function Admin() {
       const res = await fetch(`${API}/api/products`);
       const data = await res.json();
       setProducts(data);
-    } catch (err) { console.error("Fetch products error:", err); }
+    } catch (err) {
+      console.error("Fetch products error:", err);
+    }
   };
 
   const fetchIngredients = async () => {
@@ -33,12 +73,40 @@ export default function Admin() {
       const res = await fetch(`${API}/api/ingredients`);
       const data = await res.json();
       setIngredients(data);
-    } catch (err) { console.error("Fetch ingredients error:", err); }
+    } catch (err) {
+      console.error("Fetch ingredients error:", err);
+    }
+  };
+
+  const fetchProductRecipe = async (productId) => {
+    if (!productId) {
+      setProductRecipe([]);
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API}/api/products/${productId}/ingredients`);
+      const data = await res.json();
+      setProductRecipe(data);
+    } catch (err) {
+      console.error("Fetch product recipe error:", err);
+    }
+  };
+
+  const fetchCostingAnalysis = async () => {
+    try {
+      const res = await fetch(`${API}/api/costing-analysis`);
+      const data = await res.json();
+      setCostingAnalysis(data);
+    } catch (err) {
+      console.error("Fetch costing analysis error:", err);
+    }
   };
 
   useEffect(() => {
     fetchProducts();
     fetchIngredients();
+    fetchCostingAnalysis();
   }, []);
 
   /* ================= PRODUCT ACTIONS ================= */
@@ -53,13 +121,18 @@ export default function Admin() {
     formData.append("price", Number(price));
     if (image) formData.append("image", image);
 
-    const res = await fetch(`${API}/api/products`, { method: "POST", body: formData });
+    const res = await fetch(`${API}/api/products`, {
+      method: "POST",
+      body: formData
+    });
+
     if (res.ok) {
       setName("");
       setCategory("");
       setPrice("");
       setImage(null);
       fetchProducts();
+      fetchCostingAnalysis();
     }
   };
 
@@ -67,37 +140,60 @@ export default function Admin() {
     if (window.confirm("Delete this product?")) {
       await fetch(`${API}/api/products/${id}`, { method: "DELETE" });
       fetchProducts();
+      fetchCostingAnalysis();
+
+      if (String(selectedProductId) === String(id)) {
+        setSelectedProductId("");
+        setProductRecipe([]);
+      }
     }
   };
 
   /* ================= INGREDIENT ACTIONS ================= */
   const addIngredient = async () => {
-    if (!ingredientName || !stock || !ingPrice) return alert("Fill all fields");
+    if (!ingredientName || !ingUnit || !stock || !ingPrice) {
+      return alert("Fill all fields");
+    }
+
     try {
       const res = await fetch(`${API}/api/ingredients`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: ingredientName,
+          unit: ingUnit,
           stock: Number(stock),
           price: Number(ingPrice)
         })
       });
+
       if (res.ok) {
-        setIngredientName(""); setStock(""); setIngPrice("");
+        setIngredientName("");
+        setIngUnit("pcs");
+        setStock("");
+        setIngPrice("");
         fetchIngredients();
+        fetchCostingAnalysis();
       }
-    } catch (err) { console.error("Add ingredient error:", err); }
+    } catch (err) {
+      console.error("Add ingredient error:", err);
+    }
   };
 
-  // FIXED UPDATE STOCK FUNCTION
-  const updateStock = async (id, change) => {
+  const updateStock = async (id, change, unit) => {
+    let adjustedChange = change;
+
+    if (unit === "mL" || unit === "g") adjustedChange = change * 10;
+    if (unit === "L" || unit === "kg") adjustedChange = change * 0.1;
+    if (unit === "pcs") adjustedChange = change;
+
     try {
       const res = await fetch(`${API}/api/ingredients/${id}/stock`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ change })
+        body: JSON.stringify({ change: adjustedChange })
       });
+
       if (res.ok) {
         fetchIngredients();
       }
@@ -110,24 +206,113 @@ export default function Admin() {
     if (window.confirm("Delete this ingredient?")) {
       await fetch(`${API}/api/ingredients/${id}`, { method: "DELETE" });
       fetchIngredients();
+      fetchCostingAnalysis();
+
+      if (selectedProductId) {
+        fetchProductRecipe(selectedProductId);
+      }
     }
   };
 
-  return (
-    <div className="admin-container">
-      <Navbar />
+  /* ================= COSTING ACTIONS ================= */
+  const addRecipeIngredient = async () => {
+    if (!selectedProductId || !selectedIngredientId || !recipeQuantity || !recipeInputUnit) {
+      return alert("Select product, ingredient, quantity, and unit");
+    }
 
-      <main className="admin-content">
+    try {
+      const selectedIngredient = getIngredientById(selectedIngredientId);
+
+      if (!selectedIngredient) {
+        return alert("Invalid ingredient selected");
+      }
+
+      const existing = productRecipe.find(
+        (item) => String(item.ingredient_id) === String(selectedIngredientId)
+      );
+
+      if (existing) {
+        return alert("This ingredient is already in the recipe. Delete it first if you want to change it.");
+      }
+
+      const convertedQuantity = convertToBaseUnit(
+        recipeQuantity,
+        recipeInputUnit,
+        selectedIngredient.unit
+      );
+
+      if (convertedQuantity === null) {
+        return alert(`Cannot convert ${recipeInputUnit} to ${selectedIngredient.unit}`);
+      }
+
+      const res = await fetch(`${API}/api/products/${selectedProductId}/ingredients`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ingredient_id: selectedIngredientId,
+          quantity: convertedQuantity
+        })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        return alert(data.message || "Failed to add ingredient to recipe");
+      }
+
+      setSelectedIngredientId("");
+      setRecipeQuantity("");
+      setRecipeInputUnit("");
+      fetchProductRecipe(selectedProductId);
+      fetchCostingAnalysis();
+    } catch (err) {
+      console.error("Add recipe ingredient error:", err);
+    }
+  };
+
+  const deleteRecipeIngredient = async (id) => {
+    try {
+      const res = await fetch(`${API}/api/product-ingredients/${id}`, {
+        method: "DELETE"
+      });
+
+      if (res.ok) {
+        fetchProductRecipe(selectedProductId);
+        fetchCostingAnalysis();
+      }
+    } catch (err) {
+      console.error("Delete recipe ingredient error:", err);
+    }
+  };
+
+return (
+  <div className="admin-container">
+    <Navbar onMenuClick={() => setSidebarOpen(true)} />
+    <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+
+    <main className="admin-content">
         <header className="admin-header">
           <h1>Admin Dashboard</h1>
           <p>Manage your inventory and products seamlessly.</p>
-          
+
           <nav className="tab-navigation">
-            <button className={tab === "products" ? "nav-btn active" : "nav-btn"} onClick={() => setTab("products")}>
+            <button
+              className={tab === "products" ? "nav-btn active" : "nav-btn"}
+              onClick={() => setTab("products")}
+            >
               <span className="icon">☕</span> Products
             </button>
-            <button className={tab === "ingredients" ? "nav-btn active" : "nav-btn"} onClick={() => setTab("ingredients")}>
+            <button
+              className={tab === "ingredients" ? "nav-btn active" : "nav-btn"}
+              onClick={() => setTab("ingredients")}
+            >
               <span className="icon">🌿</span> Ingredients
+            </button>
+            <button
+              className={tab === "costing" ? "nav-btn active" : "nav-btn"}
+              onClick={() => setTab("costing")}
+            >
+              <span className="icon">📊</span> Cost Analysis
             </button>
           </nav>
         </header>
@@ -136,8 +321,13 @@ export default function Admin() {
           {tab === "products" ? (
             <div className="glass-card">
               <div className="card-header"><h2>Product Management</h2></div>
+
               <div className="form-group">
-                <input placeholder="Product Name" value={name} onChange={(e) => setName(e.target.value)} />
+                <input
+                  placeholder="Product Name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
 
                 <select value={category} onChange={(e) => setCategory(e.target.value)}>
                   <option value="">Select Category</option>
@@ -150,12 +340,28 @@ export default function Admin() {
                   <option value="Dirty Soda">Dirty Soda</option>
                 </select>
 
-                <input placeholder="Price (₱)" type="number" value={price} onChange={(e) => setPrice(e.target.value)} />
+                <input
+                  placeholder="Price (₱)"
+                  type="number"
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                />
+
                 <div className="file-input-wrapper">
-                   <input type="file" id="prod-img" className="file-input" onChange={(e) => setImage(e.target.files[0])} />
-                   <label htmlFor="prod-img">{image ? "Image Selected" : "Choose Image"}</label>
+                  <input
+                    type="file"
+                    id="prod-img"
+                    className="file-input"
+                    onChange={(e) => setImage(e.target.files[0])}
+                  />
+                  <label htmlFor="prod-img">
+                    {image ? "Image Selected" : "Choose Image"}
+                  </label>
                 </div>
-                <button className="btn-primary" onClick={addProduct}>Add Product</button>
+
+                <button className="btn-primary" onClick={addProduct}>
+                  Add Product
+                </button>
               </div>
 
               <div className="table-wrapper">
@@ -172,25 +378,69 @@ export default function Admin() {
                   <tbody>
                     {products.map((p) => (
                       <tr key={p.id}>
-                        <td><div className="img-center-wrapper"><img src={p.image ? API + p.image : "/placeholder.png"} className="table-img" /></div></td>
+                        <td>
+                          <div className="img-center-wrapper">
+                            <img
+                              src={p.image ? API + p.image : "/placeholder.png"}
+                              className="table-img"
+                            />
+                          </div>
+                        </td>
                         <td className="font-bold">{p.name}</td>
                         <td>{p.category}</td>
                         <td className="price-tag">₱{Number(p.price).toLocaleString()}</td>
-                        <td><button className="btn-danger" onClick={() => deleteProduct(p.id)}>Delete</button></td>
+                        <td>
+                          <button className="btn-danger" onClick={() => deleteProduct(p.id)}>
+                            Delete
+                          </button>
+                        </td>
                       </tr>
                     ))}
+                    {products.length === 0 && (
+                      <tr>
+                        <td colSpan="5">No products yet.</td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
             </div>
-          ) : (
+          ) : tab === "ingredients" ? (
             <div className="glass-card">
               <div className="card-header"><h2>Ingredients Inventory</h2></div>
+
               <div className="form-group">
-                <input placeholder="Ingredient Name" value={ingredientName} onChange={(e) => setIngredientName(e.target.value)} />
-                <input placeholder="Stock Qty" type="number" value={stock} onChange={(e) => setStock(e.target.value)} />
-                <input placeholder="Price/Unit (₱)" type="number" value={ingPrice} onChange={(e) => setIngPrice(e.target.value)} />
-                <button className="btn-primary" onClick={addIngredient}>Add Item</button>
+                <input
+                  placeholder="Ingredient Name"
+                  value={ingredientName}
+                  onChange={(e) => setIngredientName(e.target.value)}
+                />
+
+                <select value={ingUnit} onChange={(e) => setIngUnit(e.target.value)}>
+                  <option value="L">L</option>
+                  <option value="mL">mL</option>
+                  <option value="g">g</option>
+                  <option value="kg">kg</option>
+                  <option value="pcs">pcs</option>
+                </select>
+
+                <input
+                  placeholder={`Stock Qty (${ingUnit})`}
+                  type="number"
+                  value={stock}
+                  onChange={(e) => setStock(e.target.value)}
+                />
+
+                <input
+                  placeholder={`Price per ${ingUnit} (₱)`}
+                  type="number"
+                  value={ingPrice}
+                  onChange={(e) => setIngPrice(e.target.value)}
+                />
+
+                <button className="btn-primary" onClick={addIngredient}>
+                  Add Item
+                </button>
               </div>
 
               <div className="table-wrapper">
@@ -198,6 +448,7 @@ export default function Admin() {
                   <thead>
                     <tr>
                       <th>Ingredient</th>
+                      <th>Unit</th>
                       <th>Current Stock</th>
                       <th>Unit Price</th>
                       <th>Total Value</th>
@@ -208,23 +459,209 @@ export default function Admin() {
                     {ingredients.map((i) => (
                       <tr key={i.id}>
                         <td className="font-bold">{i.name}</td>
+                        <td>{i.unit}</td>
                         <td>
-                          <div className="stock-control">
-                            <button onClick={() => updateStock(i.id, -1)} className="stock-btn">-</button>
-                            <span className="stock-val">{i.stock}</span>
-                            <button onClick={() => updateStock(i.id, 1)} className="stock-btn">+</button>
+                          <div className="stock-with-unit">
+                            <div className="stock-control">
+                              <button
+                                onClick={() => updateStock(i.id, -1, i.unit)}
+                                className="stock-btn"
+                              >
+                                -
+                              </button>
+                              <span className="stock-val">{i.stock}</span>
+                              <button
+                                onClick={() => updateStock(i.id, 1, i.unit)}
+                                className="stock-btn"
+                              >
+                                +
+                              </button>
+                            </div>
+                            <span className="unit-label">{i.unit}</span>
                           </div>
                         </td>
-                        <td className="price-tag">₱{i.price}</td>
+                        <td className="price-tag">₱{i.price} / {i.unit}</td>
                         <td className="total-val">₱{(i.stock * i.price).toLocaleString()}</td>
-                        <td><button className="btn-danger" onClick={() => deleteIngredient(i.id)}>Delete</button></td>
+                        <td>
+                          <button className="btn-danger" onClick={() => deleteIngredient(i.id)}>
+                            Delete
+                          </button>
+                        </td>
                       </tr>
                     ))}
+                    {ingredients.length === 0 && (
+                      <tr>
+                        <td colSpan="6">No ingredients yet.</td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
+
               <div className="inventory-footer">
-                <h3>Total Inventory Value: <span>₱{ingredients.reduce((sum, i) => sum + i.stock * i.price, 0).toLocaleString()}</span></h3>
+                <h3>
+                  Total Inventory Value:{" "}
+                  <span>
+                    ₱{ingredients.reduce((sum, i) => sum + i.stock * i.price, 0).toLocaleString()}
+                  </span>
+                </h3>
+              </div>
+            </div>
+          ) : (
+            <div className="glass-card">
+              <div className="card-header"><h2>Cost Analysis</h2></div>
+
+              <div className="form-group">
+                <select
+                  value={selectedProductId}
+                  onChange={(e) => {
+                    setSelectedProductId(e.target.value);
+                    setSelectedIngredientId("");
+                    setRecipeQuantity("");
+                    setRecipeInputUnit("");
+                    fetchProductRecipe(e.target.value);
+                  }}
+                >
+                  <option value="">Select Product</option>
+                  {products.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {selectedProductId && (
+                <>
+                  <div className="card-header" style={{ marginBottom: "1rem" }}>
+                    <h2>Edit Recipe</h2>
+                  </div>
+
+                  <div className="form-group">
+                    <select
+                      value={selectedIngredientId}
+                      onChange={(e) => {
+                        const ingredientId = e.target.value;
+                        setSelectedIngredientId(ingredientId);
+                        setRecipeQuantity("");
+                        const ingredient = getIngredientById(ingredientId);
+                        if (ingredient) {
+                          const options = getRecipeUnitOptions(ingredient.unit);
+                          setRecipeInputUnit(options[0]);
+                        } else {
+                          setRecipeInputUnit("");
+                        }
+                      }}
+                    >
+                      <option value="">Select Ingredient</option>
+                      {ingredients.map((i) => (
+                        <option key={i.id} value={i.id}>
+                          {i.name} ({i.unit})
+                        </option>
+                      ))}
+                    </select>
+
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="Quantity Used"
+                      value={recipeQuantity}
+                      onChange={(e) => setRecipeQuantity(e.target.value)}
+                    />
+
+                    <select
+                      value={recipeInputUnit}
+                      onChange={(e) => setRecipeInputUnit(e.target.value)}
+                      disabled={!selectedIngredientId}
+                    >
+                      {!selectedIngredientId ? (
+                        <option value="">Select Unit</option>
+                      ) : (
+                        getRecipeUnitOptions(getIngredientById(selectedIngredientId)?.unit || "pcs").map((unit) => (
+                          <option key={unit} value={unit}>
+                            {unit}
+                          </option>
+                        ))
+                      )}
+                    </select>
+
+                    <button className="btn-primary" onClick={addRecipeIngredient}>
+                      Add to Recipe
+                    </button>
+                  </div>
+
+                  <div className="table-wrapper" style={{ marginBottom: "2rem" }}>
+                    <table className="black-border-table">
+                      <thead>
+                        <tr>
+                          <th>Ingredient</th>
+                          <th>Base Unit</th>
+                          <th>Unit Cost</th>
+                          <th>Quantity Used</th>
+                          <th>Cost</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {productRecipe.map((r) => (
+                          <tr key={r.id}>
+                            <td>{r.ingredient_name}</td>
+                            <td>{r.ingredient_unit}</td>
+                            <td>₱{Number(r.ingredient_price).toLocaleString()} / {r.ingredient_unit}</td>
+                            <td>{r.quantity} {r.ingredient_unit}</td>
+                            <td>₱{(Number(r.quantity) * Number(r.ingredient_price)).toLocaleString()}</td>
+                            <td>
+                              <button
+                                className="btn-danger"
+                                onClick={() => deleteRecipeIngredient(r.id)}
+                              >
+                                Delete
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                        {productRecipe.length === 0 && (
+                          <tr>
+                            <td colSpan="6">No recipe ingredients yet.</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+
+              <div className="table-wrapper">
+                <table className="black-border-table">
+                  <thead>
+                    <tr>
+                      <th>Product Name</th>
+                      <th>Category</th>
+                      <th>Selling Price</th>
+                      <th>Total Cost</th>
+                      <th>Profit</th>
+                      <th>Margin %</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {costingAnalysis.map((item) => (
+                      <tr key={item.id}>
+                        <td className="font-bold">{item.name}</td>
+                        <td>{item.category}</td>
+                        <td>₱{Number(item.selling_price).toLocaleString()}</td>
+                        <td>₱{Number(item.total_cost).toLocaleString()}</td>
+                        <td className="price-tag">₱{Number(item.profit).toLocaleString()}</td>
+                        <td className="total-val">{Number(item.margin).toFixed(2)}%</td>
+                      </tr>
+                    ))}
+                    {costingAnalysis.length === 0 && (
+                      <tr>
+                        <td colSpan="6">No costing analysis available yet.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}
@@ -233,7 +670,7 @@ export default function Admin() {
 
       <style jsx>{`
         .admin-container {
-        background-color: #fff7f0;
+          background-color: #fff7f0;
           //background-image: url("/background.jpg"); BACKGROUND
           background-size: cover;
           background-position: center;
@@ -243,13 +680,46 @@ export default function Admin() {
           color: #4a3728;
         }
 
-        .admin-content { max-width: 1000px; margin: 0 auto; padding: 2rem 1rem; }
-        .admin-header { text-align: center; margin-bottom: 2rem; }
-        .admin-header h1 { font-size: 2.4rem; color: #6b4f3a; margin: 0; font-weight: 800; }
-        
-        .tab-navigation { display: flex; justify-content: center; gap: 1rem; margin-top: 1rem; }
-        .nav-btn { padding: 10px 24px; border: 2px solid #6b4f3a; border-radius: 50px; background: rgba(255,255,255,0.8); cursor: pointer; font-weight: 700; color: #6b4f3a; }
-        .nav-btn.active { background: #6b4f3a; color: #fff; }
+        .admin-content {
+          max-width: 1000px;
+          margin: 0 auto;
+          padding: 2rem 1rem;
+        }
+
+        .admin-header {
+          text-align: center;
+          margin-bottom: 2rem;
+        }
+
+        .admin-header h1 {
+          font-size: 2.4rem;
+          color: #6b4f3a;
+          margin: 0;
+          font-weight: 800;
+        }
+
+        .tab-navigation {
+          display: flex;
+          justify-content: center;
+          gap: 1rem;
+          margin-top: 1rem;
+          flex-wrap: wrap;
+        }
+
+        .nav-btn {
+          padding: 10px 24px;
+          border: 2px solid #6b4f3a;
+          border-radius: 50px;
+          background: rgba(255,255,255,0.8);
+          cursor: pointer;
+          font-weight: 700;
+          color: #6b4f3a;
+        }
+
+        .nav-btn.active {
+          background: #6b4f3a;
+          color: #fff;
+        }
 
         .glass-card {
           background: rgba(255, 255, 255, 0.95);
@@ -260,29 +730,80 @@ export default function Admin() {
         }
 
         .form-group {
-          display: flex; gap: 10px; margin-bottom: 2rem; padding: 1.2rem;
-          background: #fbf9f7; border-radius: 12px; border: 1px solid #000;
-          justify-content: center; align-items: center;
+          display: flex;
+          gap: 10px;
+          margin-bottom: 2rem;
+          padding: 1.2rem;
+          background: #fbf9f7;
+          border-radius: 12px;
+          border: 1px solid #000;
+          justify-content: center;
+          align-items: center;
+          flex-wrap: wrap;
         }
 
-        input, select { padding: 10px; border: 1px solid #000; border-radius: 8px; width: 160px; }
-        .btn-primary { background: #6b4f3a; color: white; padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: 700; }
+        input, select {
+          padding: 10px;
+          border: 1px solid #000;
+          border-radius: 8px;
+          width: 160px;
+        }
 
-        /* BLACK BORDER TABLE STYLES */
-        .black-border-table { width: 100%; border-collapse: collapse; border: 1px solid #000; }
-        .black-border-table th, .black-border-table td {
+        .btn-primary {
+          background: #6b4f3a;
+          color: white;
+          padding: 10px 20px;
+          border: none;
+          border-radius: 8px;
+          cursor: pointer;
+          font-weight: 700;
+        }
+
+        .black-border-table {
+          width: 100%;
+          border-collapse: collapse;
+          border: 1px solid #000;
+        }
+
+        .black-border-table th,
+        .black-border-table td {
           border: 1px solid #000;
           padding: 12px;
           text-align: center;
         }
-        .black-border-table th { background: #f2ede9; font-size: 0.85rem; }
 
-        .table-img { width: 50px; height: 50px; object-fit: cover; border-radius: 8px; border: 1px solid #000; }
-        .img-center-wrapper { display: flex; justify-content: center; }
+        .black-border-table th {
+          background: #f2ede9;
+          font-size: 0.85rem;
+        }
 
-        .font-bold { font-weight: 700; color: #4a3728; }
-        .price-tag { font-weight: 700; color: #2e7d32; }
-        .total-val { font-weight: 800; color: #6b4f3a; }
+        .table-img {
+          width: 50px;
+          height: 50px;
+          object-fit: cover;
+          border-radius: 8px;
+          border: 1px solid #000;
+        }
+
+        .img-center-wrapper {
+          display: flex;
+          justify-content: center;
+        }
+
+        .font-bold {
+          font-weight: 700;
+          color: #4a3728;
+        }
+
+        .price-tag {
+          font-weight: 700;
+          color: #2e7d32;
+        }
+
+        .total-val {
+          font-weight: 800;
+          color: #6b4f3a;
+        }
 
         .btn-danger {
           background: #b3261e;
@@ -301,6 +822,19 @@ export default function Admin() {
           gap: 10px;
         }
 
+        .stock-with-unit {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 6px;
+        }
+
+        .unit-label {
+          font-size: 0.8rem;
+          font-weight: 700;
+          color: #6b4f3a;
+        }
+
         .stock-btn {
           width: 30px;
           height: 30px;
@@ -312,7 +846,10 @@ export default function Admin() {
           cursor: pointer;
         }
 
-        .stock-val { min-width: 24px; font-weight: 700; }
+        .stock-val {
+          min-width: 24px;
+          font-weight: 700;
+        }
 
         .inventory-footer {
           margin-top: 1.5rem;
@@ -321,9 +858,14 @@ export default function Admin() {
           font-weight: 700;
         }
 
-        .inventory-footer span { color: #2e7d32; }
+        .inventory-footer span {
+          color: #2e7d32;
+        }
 
-        .file-input { display: none; }
+        .file-input {
+          display: none;
+        }
+
         .file-input-wrapper label {
           display: inline-block;
           padding: 10px 16px;

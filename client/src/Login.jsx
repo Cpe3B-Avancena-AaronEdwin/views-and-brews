@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "./Navbar";
-
+import Sidebar from "./Sidebar";
 const API = "http://localhost:5000";
 
 export default function Login({ setIsAdminLoggedIn }) {
@@ -10,7 +10,7 @@ export default function Login({ setIsAdminLoggedIn }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const navigate = useNavigate();
 
 const handleLogin = async (e) => {
@@ -53,12 +53,13 @@ return (
 
     <div style={styles.pageWrapper}>
 
-      <Navbar />
+      <Navbar onMenuClick={() => setSidebarOpen(true)} />
+<Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
 
       <div style={styles.container}>
         <div style={styles.card}>
-          <h2 style={styles.title}>Admin Login</h2>
+          <h2 style={styles.title}>Admin</h2>
           <form onSubmit={handleLogin} style={styles.form}>
             <input
               type="text"
