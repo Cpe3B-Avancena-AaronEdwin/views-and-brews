@@ -1,10 +1,13 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom"; // Import useNavigate
+import { useNavigate } from "react-router-dom";
 import Navbar from "./Navbar";
-import "./styles/Home.css"; 
+import Sidebar from "./Sidebar";
+import "./styles/Home.css";
 
 export default function Home() {
-  const navigate = useNavigate(); // Initialize the navigate function
+  const navigate = useNavigate();
+
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const [items, setItems] = useState([
     {
@@ -65,10 +68,11 @@ export default function Home() {
 
   return (
     <div className="home-page-container">
-      {/* SECTION 1: HERO SLIDER */}
+      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+
       <section className="hero-section">
         <div className="nav-overlay">
-          <Navbar />
+          <Navbar onMenuClick={() => setSidebarOpen(true)} />
         </div>
 
         <link
@@ -87,9 +91,8 @@ export default function Home() {
                 <div className="content">
                   <div className="name">{item.name}</div>
                   <div className="des">{item.des}</div>
-                  {/* Click event added to navigate to /menu */}
-                  <button 
-                    className="see-more" 
+                  <button
+                    className="see-more"
                     onClick={() => navigate("/menu")}
                   >
                     Explore Menu
@@ -110,7 +113,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* SECTION 2: VISION & MISSION */}
       <section className="about-section">
         <div className="scroll-indicator">
           <i className="fa-solid fa-chevron-down"></i>

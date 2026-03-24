@@ -1,31 +1,63 @@
-// client/src/Sidebar.jsx
-import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import "./styles.css";
+import { Link } from "react-router-dom";
 
+function Sidebar({ isOpen, onClose }) {
+  const linkStyle = {
+    color: "white",
+    textDecoration: "none",
+    fontSize: "18px",
+    fontWeight: "bold",
+    padding: "12px 0",
+    borderBottom: "1px solid rgba(255,255,255,0.15)"
+  };
 
-export default function Sidebar({ isOpen, toggleSidebar }) {
   return (
-    <div
-      className="sidebar"
-      style={{
-        left: isOpen ? "0" : "-250px",   // slides in
-        display: isOpen ? "flex" : "none" // completely hidden when closed
-      }}
-    >
-      {/* Profile Picture */}
-      <img
-        src="https://via.placeholder.com/80"
-        alt="Profile"
-        className="profile-pic"
-      />
+    <>
+      <div
+        style={{
+          position: "fixed",
+          top: 0,
+          left: isOpen ? "0" : "-260px",
+          width: "250px",
+          height: "100vh",
+          backgroundColor: "#5a3e2b",
+          color: "white",
+          padding: "90px 20px 20px 20px",
+          transition: "0.3s ease",
+          zIndex: 1300,
+          boxShadow: isOpen ? "2px 0 12px rgba(0,0,0,0.25)" : "none",
+          boxSizing: "border-box"
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "10px"
+          }}
+        >
+          <Link to="/" style={linkStyle} onClick={onClose}>Home</Link>
+          <Link to="/menu" style={linkStyle} onClick={onClose}>Menu</Link>
+          <Link to="/about" style={linkStyle} onClick={onClose}>About</Link>
+          <Link to="/login" style={linkStyle} onClick={onClose}>Admin</Link>
+        </div>
+      </div>
 
-      {/* Links */}
-      <Link to="/signup" onClick={toggleSidebar}>Signup</Link>
-      <Link to="/client-login" onClick={toggleSidebar}>Login</Link>
-
-      {/* Logout if logged in */}
-      {localStorage.getItem("token") && <ClientLogout />}
-    </div>
+      {isOpen && (
+        <div
+          onClick={onClose}
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            background: "rgba(0,0,0,0.35)",
+            zIndex: 1200
+          }}
+        />
+      )}
+    </>
   );
 }
+
+export default Sidebar;

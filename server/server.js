@@ -7,6 +7,8 @@ import fs from "fs";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 
+import dotenv from "dotenv";
+dotenv.config();
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -14,12 +16,11 @@ app.use(express.json());
 /* ================= DB ================= */
 
 const db = mysql.createConnection({
-  host: "localhost",
-  user: "root",
-  password: "112903",
-  database: "views_and_brews"
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME
 });
-
 db.connect(err => {
   if (err) console.log("DB ERROR:", err);
   else console.log("MySQL Connected");
