@@ -28,7 +28,7 @@ function Navbar({ onMenuClick }) {
         </button>
 
         <span style={{ fontWeight: "bold", fontSize: "20px" }}>
-          Views & Brews
+          Brews & Views
         </span>
       </div>
 

@@ -8,6 +8,27 @@ export default function Admin() {
   const [products, setProducts] = useState([]);
   const [ingredients, setIngredients] = useState([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const newShift = async () => {
+    if (!window.confirm("Start a new shift? Current dashboard values will move to history.")) return;
+
+    try {
+      const res = await fetch(`${API}/api/admin/new-shift`, {
+        method: "POST"
+      });
+
+      const data = await res.json();
+      alert(data.message);
+
+      fetchProducts();
+      fetchIngredients();
+      fetchCostingAnalysis();
+      fetchProfitInsights();
+    } catch (err) {
+      console.error("New shift error:", err);
+    }
+  };
+
   // Product Form States
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
@@ -27,6 +48,17 @@ export default function Admin() {
   const [recipeInputUnit, setRecipeInputUnit] = useState("");
   const [productRecipe, setProductRecipe] = useState([]);
   const [costingAnalysis, setCostingAnalysis] = useState([]);
+
+  // Profit Insights
+  const [insights, setInsights] = useState({
+    activeShift: null,
+    topProfitable: null,
+    leastProfitable: null,
+    averageMargin: 0,
+    totalProfit: 0,
+    totalRevenue: 0,
+    dailyRevenue: []
+  });
 
   /* ================= HELPERS ================= */
   const getIngredientById = (id) => {
@@ -53,9 +85,64 @@ export default function Admin() {
     if (fromUnit === "g" && toUnit === "kg") return qty / 1000;
     if (fromUnit === "kg" && toUnit === "g") return qty * 1000;
 
-    // incompatible
     return null;
   };
+
+  const getStockStatus = (stock, unit) => {
+    const value = Number(stock);
+
+    if (unit === "pcs") {
+      if (value <= 5) return { label: "Low", color: "#b3261e", bg: "#fdecea" };
+      if (value <= 10) return { label: "Medium", color: "#b26a00", bg: "#fff4db" };
+      return { label: "Good", color: "#2e7d32", bg: "#eaf7ee" };
+    }
+
+    if (unit === "mL" || unit === "g") {
+      if (value <= 200) return { label: "Low", color: "#b3261e", bg: "#fdecea" };
+      if (value <= 500) return { label: "Medium", color: "#b26a00", bg: "#fff4db" };
+      return { label: "Good", color: "#2e7d32", bg: "#eaf7ee" };
+    }
+
+    if (unit === "L" || unit === "kg") {
+      if (value <= 1) return { label: "Low", color: "#b3261e", bg: "#fdecea" };
+      if (value <= 3) return { label: "Medium", color: "#b26a00", bg: "#fff4db" };
+      return { label: "Good", color: "#2e7d32", bg: "#eaf7ee" };
+    }
+
+    return { label: "Good", color: "#2e7d32", bg: "#eaf7ee" };
+  };
+
+  const profitInsights = (() => {
+    if (!costingAnalysis.length) {
+      return {
+        topProfit: null,
+        lowProfit: null,
+        topMargin: null,
+        avgProfit: 0,
+        avgMargin: 0
+      };
+    }
+
+    const topProfit = [...costingAnalysis].sort((a, b) => b.profit - a.profit)[0];
+    const lowProfit = [...costingAnalysis].sort((a, b) => a.profit - b.profit)[0];
+    const topMargin = [...costingAnalysis].sort((a, b) => b.margin - a.margin)[0];
+
+    const avgProfit =
+      costingAnalysis.reduce((sum, item) => sum + Number(item.profit || 0), 0) /
+      costingAnalysis.length;
+
+    const avgMargin =
+      costingAnalysis.reduce((sum, item) => sum + Number(item.margin || 0), 0) /
+      costingAnalysis.length;
+
+    return {
+      topProfit,
+      lowProfit,
+      topMargin,
+      avgProfit,
+      avgMargin
+    };
+  })();
 
   /* ================= FETCH LOGIC ================= */
   const fetchProducts = async () => {
@@ -103,10 +190,29 @@ export default function Admin() {
     }
   };
 
+  const fetchProfitInsights = async () => {
+    try {
+      const res = await fetch(`${API}/api/admin/profit-insights`);
+      const data = await res.json();
+      setInsights({
+        activeShift: data.activeShift || null,
+        topProfitable: data.topProfitable || null,
+        leastProfitable: data.leastProfitable || null,
+        averageMargin: data.averageMargin || 0,
+        totalProfit: data.totalProfit || 0,
+        totalRevenue: data.totalRevenue || 0,
+        dailyRevenue: data.dailyRevenue || []
+      });
+    } catch (err) {
+      console.error("Fetch profit insights error:", err);
+    }
+  };
+
   useEffect(() => {
     fetchProducts();
     fetchIngredients();
     fetchCostingAnalysis();
+    fetchProfitInsights();
   }, []);
 
   /* ================= PRODUCT ACTIONS ================= */
@@ -133,6 +239,7 @@ export default function Admin() {
       setImage(null);
       fetchProducts();
       fetchCostingAnalysis();
+      fetchProfitInsights();
     }
   };
 
@@ -141,6 +248,7 @@ export default function Admin() {
       await fetch(`${API}/api/products/${id}`, { method: "DELETE" });
       fetchProducts();
       fetchCostingAnalysis();
+      fetchProfitInsights();
 
       if (String(selectedProductId) === String(id)) {
         setSelectedProductId("");
@@ -174,6 +282,7 @@ export default function Admin() {
         setIngPrice("");
         fetchIngredients();
         fetchCostingAnalysis();
+        fetchProfitInsights();
       }
     } catch (err) {
       console.error("Add ingredient error:", err);
@@ -207,6 +316,7 @@ export default function Admin() {
       await fetch(`${API}/api/ingredients/${id}`, { method: "DELETE" });
       fetchIngredients();
       fetchCostingAnalysis();
+      fetchProfitInsights();
 
       if (selectedProductId) {
         fetchProductRecipe(selectedProductId);
@@ -265,6 +375,7 @@ export default function Admin() {
       setRecipeInputUnit("");
       fetchProductRecipe(selectedProductId);
       fetchCostingAnalysis();
+      fetchProfitInsights();
     } catch (err) {
       console.error("Add recipe ingredient error:", err);
     }
@@ -279,67 +390,61 @@ export default function Admin() {
       if (res.ok) {
         fetchProductRecipe(selectedProductId);
         fetchCostingAnalysis();
+        fetchProfitInsights();
       }
     } catch (err) {
       console.error("Delete recipe ingredient error:", err);
     }
   };
-const getStockStatus = (stock, unit) => {
-  const value = Number(stock);
 
-  if (unit === "pcs") {
-    if (value <= 5) return { label: "Low", color: "#b3261e", bg: "#fdecea" };
-    if (value <= 10) return { label: "Medium", color: "#b26a00", bg: "#fff4db" };
-    return { label: "Good", color: "#2e7d32", bg: "#eaf7ee" };
-  }
+  return (
+    <div className="admin-container">
+      <Navbar onMenuClick={() => setSidebarOpen(true)} />
+      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-  if (unit === "mL" || unit === "g") {
-    if (value <= 200) return { label: "Low", color: "#b3261e", bg: "#fdecea" };
-    if (value <= 500) return { label: "Medium", color: "#b26a00", bg: "#fff4db" };
-    return { label: "Good", color: "#2e7d32", bg: "#eaf7ee" };
-  }
-
-  if (unit === "L" || unit === "kg") {
-    if (value <= 1) return { label: "Low", color: "#b3261e", bg: "#fdecea" };
-    if (value <= 3) return { label: "Medium", color: "#b26a00", bg: "#fff4db" };
-    return { label: "Good", color: "#2e7d32", bg: "#eaf7ee" };
-  }
-
-  return { label: "Good", color: "#2e7d32", bg: "#eaf7ee" };
-};
-return (
-  <div className="admin-container">
-    <Navbar onMenuClick={() => setSidebarOpen(true)} />
-    <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-
-    <main className="admin-content">
+      <main className="admin-content">
         <header className="admin-header">
           <h1>Admin Dashboard</h1>
           <p>Manage your inventory and products seamlessly.</p>
 
           <nav className="tab-navigation">
-<button
-  onClick={async () => {
-    const res = await fetch("http://localhost:5000/api/orders", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        items: [{ product_id: 18, quantity: 1 }]
-      })
-    });
+            <button
+              onClick={async () => {
+                const res = await fetch("http://localhost:5000/api/orders", {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json"
+                  },
+                  body: JSON.stringify({
+                    items: [{ product_id: 18, quantity: 1 }]
+                  })
+                });
 
-    const data = await res.json();
-    alert(data.message);
+                const data = await res.json();
+                alert(data.message);
 
-    // ✅ REFRESH DATA HERE
-    fetchIngredients();
-    fetchCostingAnalysis();
-  }}
->
-  Test Order
-</button>
+                fetchIngredients();
+                fetchCostingAnalysis();
+                fetchProfitInsights();
+              }}
+            >
+              Test Order
+            </button>
+
+            <button
+              onClick={newShift}
+              style={{
+                background: "#6b4f3a",
+                color: "white",
+                padding: "10px 20px",
+                borderRadius: "8px",
+                border: "none",
+                fontWeight: "700"
+              }}
+            >
+              New Shift
+            </button>
+
             <button
               className={tab === "products" ? "nav-btn active" : "nav-btn"}
               onClick={() => setTab("products")}
@@ -360,6 +465,143 @@ return (
             </button>
           </nav>
         </header>
+
+        <div className="glass-card" style={{ marginBottom: "20px" }}>
+          <div className="card-header">
+            <h2>Profit Insights Dashboard</h2>
+          </div>
+
+<div
+  style={{
+    display: "grid",
+    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+    gap: "12px",
+    marginBottom: "20px"
+  }}
+>
+            <div style={{ padding: "16px", border: "1px solid #000", borderRadius: "12px", background: "#fbf9f7", minWidth: "180px", textAlign: "center"}}>
+              <h4>Active Shift</h4>
+              <p>{insights.activeShift?.name || "No Active Shift"}</p>
+            </div>
+
+
+            <div
+              style={{
+                padding: "16px",
+                border: "1px solid #000",
+                borderRadius: "12px",
+                background: "#eef4ff",
+                minWidth: "180px",
+                textAlign: "center"
+              }}
+            >
+              <h4>Top Profitable Product</h4>
+              <p>{insights.topProfitable?.name || "N/A"}</p>
+              <strong style={{ color: "#1565c0" }}>
+                ₱{Number(insights.topProfitable?.total_profit || 0).toFixed(2)}
+              </strong>
+            </div>
+
+            <div
+              style={{
+                padding: "16px",
+                border: "1px solid #000",
+                borderRadius: "12px",
+                background: "#fdecea",
+                minWidth: "180px",
+                textAlign: "center"
+
+              }}
+            >
+              <h4>Least Profitable Product</h4>
+              <p>{insights.leastProfitable?.name || "N/A"}</p>
+              <strong style={{ color: "#b3261e" }}>
+                ₱{Number(insights.leastProfitable?.total_profit || 0).toFixed(2)}
+              </strong>
+            </div>
+                        <div
+              style={{
+                padding: "16px",
+                border: "1px solid #000",
+                borderRadius: "12px",
+                background: "#fbf9f7",
+                minWidth: "180px",
+                textAlign: "center"
+              }}
+            >
+              <h4>Shift Revenue</h4>
+              <strong>₱{Number(insights.totalRevenue || 0).toFixed(2)}</strong>
+            </div>
+
+            <div
+              style={{
+                padding: "16px",
+                border: "1px solid #000",
+                borderRadius: "12px",
+                background: "#fbf9f7",
+                minWidth: "180px",
+                textAlign: "center"
+              }}
+            >
+              <h4>Average Margin</h4>
+              <p>{Number(insights.averageMargin || 0).toFixed(2)}%</p>
+            </div>
+
+            <div
+              style={{
+                padding: "16px",
+                border: "1px solid #000",
+                borderRadius: "12px",
+                background: "#eaf7ee",
+                minWidth: "180px",
+                textAlign: "center"
+              }}
+            >
+              <h4>Total Profit</h4>
+              <strong style={{ color: "#2e7d32" }}>
+                ₱{Number(insights.totalProfit || 0).toFixed(2)}
+              </strong>
+            </div>
+          </div>
+
+          <div style={{ marginTop: "20px" }}>
+            <h3>Total Revenue History Per Day</h3>
+
+            {insights.dailyRevenue.length === 0 ? (
+              <p>No revenue data yet.</p>
+            ) : (
+              <div className="table-wrapper">
+                <table className="black-border-table">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Total Revenue</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {insights.dailyRevenue.map((item, index) => (
+                      <tr key={index}>
+                        <td>
+                          {new Date(item.day).toLocaleDateString("en-PH", {
+                            year: "numeric",
+                            month: "long",
+                            day: "numeric"
+                          })}
+                        </td>
+                        <td className="price-tag">
+                          ₱{Number(item.revenue).toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2
+                          })}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
 
         <section className="main-section">
           {tab === "products" ? (
@@ -427,6 +669,7 @@ return (
                             <img
                               src={p.image ? API + p.image : "/placeholder.png"}
                               className="table-img"
+                              alt={p.name}
                             />
                           </div>
                         </td>
@@ -455,11 +698,12 @@ return (
 
               <div className="form-group">
                 <div className="alert-summary">
-  <h3>Low Stock Alerts</h3>
-  <p>
-    {ingredients.filter((i) => getStockStatus(i.stock, i.unit).label === "Low").length} low stock item(s)
-  </p>
-</div>
+                  <h3>Low Stock Alerts</h3>
+                  <p>
+                    {ingredients.filter((i) => getStockStatus(i.stock, i.unit).label === "Low").length} low stock item(s)
+                  </p>
+                </div>
+
                 <input
                   placeholder="Ingredient Name"
                   value={ingredientName}
@@ -497,98 +741,68 @@ return (
                 <table className="black-border-table">
                   <thead>
                     <tr>
-<th>Ingredient</th>
-<th>Unit</th>
-<th>Current Stock</th>
-<th>Status</th>
-<th>Unit Price</th>
-<th>Total Value</th>
-<th>Actions</th>
+                      <th>Ingredient</th>
+                      <th>Unit</th>
+                      <th>Current Stock</th>
+                      <th>Status</th>
+                      <th>Unit Price</th>
+                      <th>Total Value</th>
+                      <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-{ingredients.map((i) => {
-  const stockStatus = getStockStatus(i.stock, i.unit); // ✅ VALID HERE
-const profitInsights = (() => {
-  if (!costingAnalysis.length) {
-    return {
-      topProfit: null,
-      lowProfit: null,
-      topMargin: null,
-      avgProfit: 0,
-      avgMargin: 0
-    };
-  }
+                    {ingredients.map((i) => {
+                      const stockStatus = getStockStatus(i.stock, i.unit);
 
-  const topProfit = [...costingAnalysis].sort((a, b) => b.profit - a.profit)[0];
-  const lowProfit = [...costingAnalysis].sort((a, b) => a.profit - b.profit)[0];
-  const topMargin = [...costingAnalysis].sort((a, b) => b.margin - a.margin)[0];
+                      return (
+                        <tr key={i.id}>
+                          <td className="font-bold">{i.name}</td>
+                          <td>{i.unit}</td>
 
-  const avgProfit =
-    costingAnalysis.reduce((sum, item) => sum + Number(item.profit || 0), 0) /
-    costingAnalysis.length;
+                          <td>
+                            <div className="stock-with-unit">
+                              <div className="stock-control">
+                                <button
+                                  onClick={() => updateStock(i.id, -10, i.unit)}
+                                  className="stock-btn"
+                                >
+                                  -
+                                </button>
+                                <span className="stock-val">{i.stock}</span>
+                                <button
+                                  onClick={() => updateStock(i.id, 10, i.unit)}
+                                  className="stock-btn"
+                                >
+                                  +
+                                </button>
+                              </div>
+                              <span className="unit-label">{i.unit}</span>
+                            </div>
+                          </td>
 
-  const avgMargin =
-    costingAnalysis.reduce((sum, item) => sum + Number(item.margin || 0), 0) /
-    costingAnalysis.length;
+                          <td>
+                            <span
+                              className="status-badge"
+                              style={{
+                                color: stockStatus.color,
+                                backgroundColor: stockStatus.bg
+                              }}
+                            >
+                              {stockStatus.label}
+                            </span>
+                          </td>
 
-  return {
-    topProfit,
-    lowProfit,
-    topMargin,
-    avgProfit,
-    avgMargin
-  };
-})();
-  return (
-    <tr key={i.id}>
-      <td className="font-bold">{i.name}</td>
-      <td>{i.unit}</td>
+                          <td className="price-tag">₱{i.price} / {i.unit}</td>
+                          <td className="total-val">₱{(i.stock * i.price).toLocaleString()}</td>
 
-      <td>
-        <div className="stock-with-unit">
-          <div className="stock-control">
-            <button
-              onClick={() => updateStock(i.id, -10, i.unit)}
-              className="stock-btn"
-            >
-              -
-            </button>
-            <span className="stock-val">{i.stock}</span>
-            <button
-              onClick={() => updateStock(i.id, 10, i.unit)}
-              className="stock-btn"
-            >
-              +
-            </button>
-          </div>
-          <span className="unit-label">{i.unit}</span>
-        </div>
-      </td>
-
-      <td>
-        <span
-          className="status-badge"
-          style={{
-            color: stockStatus.color,
-            backgroundColor: stockStatus.bg
-          }}
-        >
-          {stockStatus.label}
-        </span>
-      </td>
-
-      <td className="price-tag">₱{i.price} / {i.unit}</td>
-      <td className="total-val">₱{(i.stock * i.price).toLocaleString()}</td>
-
-      <td>
-        <button className="btn-danger" onClick={() => deleteIngredient(i.id)}>
-          Delete
-        </button>
-      </td>
-    </tr>
-  );
-})}
+                          <td>
+                            <button className="btn-danger" onClick={() => deleteIngredient(i.id)}>
+                              Delete
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                     {ingredients.length === 0 && (
                       <tr>
                         <td colSpan="7">No ingredients yet.</td>
@@ -600,7 +814,7 @@ const profitInsights = (() => {
 
               <div className="inventory-footer">
                 <h3>
-                  Total Inventory Value:{" "}
+                  Total Inventory Value{" "}
                   <span>
                     ₱{ingredients.reduce((sum, i) => sum + i.stock * i.price, 0).toLocaleString()}
                   </span>
@@ -610,7 +824,39 @@ const profitInsights = (() => {
           ) : (
             <div className="glass-card">
               <div className="card-header"><h2>Cost Analysis</h2></div>
-              
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                  gap: "12px",
+                  marginBottom: "20px"
+                }}
+              >
+                <div style={{ padding: "16px", border: "1px solid #000", borderRadius: "12px", background: "#fbf9f7" }}>
+                  <h4>Highest Recipe Profit</h4>
+                  <p>{profitInsights.topProfit?.name || "N/A"}</p>
+                  <strong>₱{Number(profitInsights.topProfit?.profit || 0).toFixed(2)}</strong>
+                </div>
+
+                <div style={{ padding: "16px", border: "1px solid #000", borderRadius: "12px", background: "#fbf9f7" }}>
+                  <h4>Lowest Recipe Profit</h4>
+                  <p>{profitInsights.lowProfit?.name || "N/A"}</p>
+                  <strong>₱{Number(profitInsights.lowProfit?.profit || 0).toFixed(2)}</strong>
+                </div>
+
+                <div style={{ padding: "16px", border: "1px solid #000", borderRadius: "12px", background: "#fbf9f7" }}>
+                  <h4>Best Margin Product</h4>
+                  <p>{profitInsights.topMargin?.name || "N/A"}</p>
+                  <strong>{Number(profitInsights.topMargin?.margin || 0).toFixed(2)}%</strong>
+                </div>
+
+                <div style={{ padding: "16px", border: "1px solid #000", borderRadius: "12px", background: "#fbf9f7" }}>
+                  <h4>Average Recipe Margin</h4>
+                  <strong>{Number(profitInsights.avgMargin || 0).toFixed(2)}%</strong>
+                </div>
+              </div>
+
               <div className="form-group">
                 <select
                   value={selectedProductId}
@@ -769,34 +1015,34 @@ const profitInsights = (() => {
       </main>
 
       <style jsx>{`
-      .alert-summary {
-  margin-bottom: 1.5rem;
-  padding: 1rem 1.2rem;
-  border: 1px solid #000;
-  border-radius: 12px;
-  background: #fff8f2;
-}
+        .alert-summary {
+          margin-bottom: 1.5rem;
+          padding: 1rem 1.2rem;
+          border: 1px solid #000;
+          border-radius: 12px;
+          background: #fff8f2;
+        }
 
-.alert-summary h3 {
-  margin: 0 0 6px 0;
-  color: #6b4f3a;
-}
+        .alert-summary h3 {
+          margin: 0 0 6px 0;
+          color: #6b4f3a;
+        }
 
-.alert-summary p {
-  margin: 0;
-  font-weight: 700;
-}
+        .alert-summary p {
+          margin: 0;
+          font-weight: 700;
+        }
 
-.status-badge {
-  display: inline-block;
-  padding: 6px 12px;
-  border-radius: 999px;
-  font-size: 0.8rem;
-  font-weight: 800;
-}
+        .status-badge {
+          display: inline-block;
+          padding: 6px 12px;
+          border-radius: 999px;
+          font-size: 0.8rem;
+          font-weight: 800;
+        }
+
         .admin-container {
           background-color: #fff7f0;
-          //background-image: url("/background.jpg"); BACKGROUND
           background-size: cover;
           background-position: center;
           background-attachment: fixed;

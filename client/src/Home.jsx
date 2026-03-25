@@ -19,7 +19,7 @@ export default function Home() {
     },
     {
       id: 2,
-      name: "Views & Brews",
+      name: "Brews & Views",
       des: "Experience coffee like never before with breathtaking scenery.",
       img: "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=1200&q=80",
     },
