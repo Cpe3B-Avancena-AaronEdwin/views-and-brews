@@ -36,9 +36,8 @@ function Sidebar({ isOpen, onClose }) {
           }}
         >
           <Link to="/" style={linkStyle} onClick={onClose}>Home</Link>
-          <Link to="/menu" style={linkStyle} onClick={onClose}>Menu</Link>
           <Link to="/about" style={linkStyle} onClick={onClose}>About</Link>
-          <Link to="/login" style={linkStyle} onClick={onClose}>Admin</Link>
+          <Link to="/login" style={linkStyle} onClick={onClose}>Login</Link>
         </div>
       </div>
 

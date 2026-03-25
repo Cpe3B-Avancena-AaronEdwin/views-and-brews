@@ -28,15 +28,12 @@ function Navbar({ onMenuClick }) {
         </button>
 
         <span style={{ fontWeight: "bold", fontSize: "20px" }}>
-          Views & Brews
+          Brews & Views
         </span>
       </div>
 
       <div>
-        <Link to="/" style={{ margin: "0 15px", color: "white", textDecoration: "none" }}>Home</Link>
-        <Link to="/menu" style={{ margin: "0 15px", color: "white", textDecoration: "none" }}>Menu</Link>
-        <Link to="/about" style={{ margin: "0 15px", color: "white", textDecoration: "none" }}>About</Link>
-        <Link to="/login" style={{ margin: "0 15px", color: "white", textDecoration: "none" }}>Admin</Link>
+
       </div>
     </nav>
   );

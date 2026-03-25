@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import Navbar from "./Navbar";
 import Sidebar from "./Sidebar";
 import "./styles/Home.css";
+import Menu from "./Menu";
 
 export default function Home() {
   const navigate = useNavigate();
@@ -18,7 +19,7 @@ export default function Home() {
     },
     {
       id: 2,
-      name: "Views & Brews",
+      name: "Brews & Views",
       des: "Experience coffee like never before with breathtaking scenery.",
       img: "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=1200&q=80",
     },
@@ -91,12 +92,7 @@ export default function Home() {
                 <div className="content">
                   <div className="name">{item.name}</div>
                   <div className="des">{item.des}</div>
-                  <button
-                    className="see-more"
-                    onClick={() => navigate("/menu")}
-                  >
-                    Explore Menu
-                  </button>
+
                 </div>
               </div>
             ))}
@@ -112,37 +108,8 @@ export default function Home() {
           </div>
         </div>
       </section>
+<Menu />
 
-      <section className="about-section">
-        <div className="scroll-indicator">
-          <i className="fa-solid fa-chevron-down"></i>
-        </div>
-
-        <div className="about-content">
-          <div className="about-card">
-            <div className="icon-box">
-              <i className="fa-solid fa-eye"></i>
-            </div>
-            <h2>Our Vision</h2>
-            <p>
-              To be the world’s most inspiring coffee destination, where every
-              cup is served with a view that fuels the soul and sparks
-              creativity.
-            </p>
-          </div>
-
-          <div className="about-card">
-            <div className="icon-box">
-              <i className="fa-solid fa-rocket"></i>
-            </div>
-            <h2>Our Mission</h2>
-            <p>
-              To craft exceptional coffee experiences by combining premium,
-              sustainably sourced beans with breathtaking locations.
-            </p>
-          </div>
-        </div>
-      </section>
     </div>
   );
 }
