@@ -6,15 +6,13 @@ import path from "path";
 import fs from "fs";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-
 import dotenv from "dotenv";
+
 dotenv.config();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
-
-/* ================= DB ================= */
 
 const db = mysql.createConnection({
   host: process.env.DB_HOST,
@@ -27,8 +25,6 @@ db.connect((err) => {
   if (err) console.log("DB ERROR:", err);
   else console.log("MySQL Connected");
 });
-
-/* ================= IMAGE UPLOAD ================= */
 
 const uploadPath = "./uploads";
 
@@ -77,9 +73,6 @@ app.get("/api/products", (req, res) => {
 app.post("/api/products", upload.single("image"), (req, res) => {
   try {
     const { name, category, price } = req.body;
-
-    console.log("BODY:", req.body);
-    console.log("FILE:", req.file);
 
     if (!name || !category || !price) {
       return res.status(400).json({
@@ -417,8 +410,6 @@ app.get("/api/getUser", (req, res) => {
   });
 });
 
-/* ================= GET CLIENT DATA ================= */
-
 app.get("/api/client-data", (req, res) => {
   const authHeader = req.headers.authorization;
 
@@ -448,430 +439,8 @@ app.get("/api/client-data", (req, res) => {
   });
 });
 
-/* ================= ORDERS / AUTO STOCK DEDUCTION ================= */
+/* ================= SHIFTS ================= */
 
-app.post("/api/orders", (req, res) => {
-  const { items } = req.body;
-
-  if (!items || !Array.isArray(items) || items.length === 0) {
-    return res.status(400).json({ success: false, message: "No order items provided" });
-  }
-
-  db.beginTransaction((err) => {
-    if (err) {
-      console.log("TRANSACTION START ERROR:", err);
-      return res.status(500).json({ success: false, message: "Transaction error" });
-    }
-
-    db.query(
-      "SELECT id, name FROM shifts WHERE is_active = 1 LIMIT 1",
-      (err, shiftRows) => {
-        if (err) {
-          return db.rollback(() => {
-            console.log("FETCH ACTIVE SHIFT ERROR:", err);
-            res.status(500).json({ success: false, message: "Failed to fetch active shift" });
-          });
-        }
-
-        if (shiftRows.length === 0) {
-          return db.rollback(() => {
-            res.status(400).json({ success: false, message: "No active shift found. Start a new shift first." });
-          });
-        }
-
-        const activeShiftId = shiftRows[0].id;
-        const productIds = items.map((item) => item.product_id);
-
-        db.query(
-          "SELECT id, price, name FROM products WHERE id IN (?)",
-          [productIds],
-          (err, products) => {
-            if (err) {
-              return db.rollback(() => {
-                console.log("FETCH PRODUCTS ERROR:", err);
-                res.status(500).json({ success: false, message: "Database error" });
-              });
-            }
-
-            let total = 0;
-            const productMap = {};
-
-            products.forEach((p) => {
-              productMap[p.id] = p;
-            });
-
-            for (const item of items) {
-              const product = productMap[item.product_id];
-              if (!product) {
-                return db.rollback(() => {
-                  res.status(400).json({
-                    success: false,
-                    message: `Product not found: ${item.product_id}`
-                  });
-                });
-              }
-
-              total += Number(product.price) * Number(item.quantity);
-            }
-
-            db.query(
-              "INSERT INTO orders (total, shift_id) VALUES (?, ?)",
-              [total, activeShiftId],
-              (err, orderResult) => {
-                if (err) {
-                  return db.rollback(() => {
-                    console.log("INSERT ORDER ERROR:", err);
-                    res.status(500).json({ success: false, message: "Failed to create order" });
-                  });
-                }
-
-                const orderId = orderResult.insertId;
-
-                db.query(
-                  `SELECT 
-                    pi.product_id,
-                    SUM(pi.quantity * i.price) AS cost
-                   FROM product_ingredients pi
-                   JOIN ingredients i ON pi.ingredient_id = i.id
-                   WHERE pi.product_id IN (?)
-                   GROUP BY pi.product_id`,
-                  [productIds],
-                  (err, costRows) => {
-                    if (err) {
-                      return db.rollback(() => {
-                        console.log("COST FETCH ERROR:", err);
-                        res.status(500).json({ success: false, message: "Failed to fetch costs" });
-                      });
-                    }
-
-                    const costMap = {};
-                    costRows.forEach((row) => {
-                      costMap[row.product_id] = Number(row.cost || 0);
-                    });
-
-                    const orderItemsValues = items.map((item) => {
-                      const product = productMap[item.product_id];
-                      const price = Number(product.price);
-                      const quantity = Number(item.quantity);
-                      const cost = Number(costMap[item.product_id] || 0);
-                      const subtotal = price * quantity;
-                      const profit = (price - cost) * quantity;
-
-                      return [
-                        orderId,
-                        item.product_id,
-                        quantity,
-                        price,
-                        cost,
-                        subtotal,
-                        profit
-                      ];
-                    });
-
-                    db.query(
-                      `INSERT INTO order_items
-                       (order_id, product_id, quantity, price, cost, subtotal, profit)
-                       VALUES ?`,
-                      [orderItemsValues],
-                      (err) => {
-                        if (err) {
-                          return db.rollback(() => {
-                            console.log("INSERT ORDER ITEMS ERROR:", err);
-                            res.status(500).json({ success: false, message: "Failed to save order items" });
-                          });
-                        }
-
-                        db.query(
-                          `SELECT 
-                            pi.product_id,
-                            pi.ingredient_id,
-                            pi.quantity AS recipe_qty,
-                            i.stock,
-                            i.name AS ingredient_name
-                          FROM product_ingredients pi
-                          JOIN ingredients i ON pi.ingredient_id = i.id
-                          WHERE pi.product_id IN (?)`,
-                          [productIds],
-                          (err, recipeRows) => {
-                            if (err) {
-                              return db.rollback(() => {
-                                console.log("FETCH RECIPE ERROR:", err);
-                                res.status(500).json({ success: false, message: "Failed to fetch recipe data" });
-                              });
-                            }
-
-                            const stockUpdates = [];
-
-                            for (const item of items) {
-                              const matchingRecipes = recipeRows.filter(
-                                (r) => Number(r.product_id) === Number(item.product_id)
-                              );
-
-                              for (const recipe of matchingRecipes) {
-                                const deduction = Number(recipe.recipe_qty) * Number(item.quantity);
-                                const newStock = Number(recipe.stock) - deduction;
-
-                                if (newStock < 0) {
-                                  return db.rollback(() => {
-                                    res.status(400).json({
-                                      success: false,
-                                      message: `Not enough stock for ingredient: ${recipe.ingredient_name}`
-                                    });
-                                  });
-                                }
-
-                                stockUpdates.push({
-                                  ingredient_id: recipe.ingredient_id,
-                                  deduction
-                                });
-                              }
-                            }
-
-                            const mergedUpdates = {};
-
-                            stockUpdates.forEach((u) => {
-                              if (!mergedUpdates[u.ingredient_id]) {
-                                mergedUpdates[u.ingredient_id] = 0;
-                              }
-                              mergedUpdates[u.ingredient_id] += u.deduction;
-                            });
-
-                            const updateEntries = Object.entries(mergedUpdates);
-                            let completed = 0;
-
-                            if (updateEntries.length === 0) {
-                              return db.commit((err) => {
-                                if (err) {
-                                  return db.rollback(() => {
-                                    console.log("COMMIT ERROR:", err);
-                                    res.status(500).json({ success: false, message: "Commit failed" });
-                                  });
-                                }
-
-                                res.json({
-                                  success: true,
-                                  message: "Order placed successfully",
-                                  order_id: orderId,
-                                  total
-                                });
-                              });
-                            }
-
-                            updateEntries.forEach(([ingredientId, deduction]) => {
-                              db.query(
-                                "UPDATE ingredients SET stock = stock - ? WHERE id = ?",
-                                [deduction, ingredientId],
-                                (err) => {
-                                  if (err) {
-                                    return db.rollback(() => {
-                                      console.log("UPDATE STOCK ERROR:", err);
-                                      res.status(500).json({ success: false, message: "Failed to update stock" });
-                                    });
-                                  }
-
-                                  completed++;
-
-                                  if (completed === updateEntries.length) {
-                                    db.commit((err) => {
-                                      if (err) {
-                                        return db.rollback(() => {
-                                          console.log("COMMIT ERROR:", err);
-                                          res.status(500).json({ success: false, message: "Commit failed" });
-                                        });
-                                      }
-
-                                      res.json({
-                                        success: true,
-                                        message: "Order placed successfully",
-                                        order_id: orderId,
-                                        total
-                                      });
-                                    });
-                                  }
-                                }
-                              );
-                            });
-                          }
-                        );
-                      }
-                    );
-                  }
-                );
-              }
-            );
-          }
-        );
-      }
-    );
-  });
-});
-/* ================= PROFIT INSIGHTS ================= */
-
-app.get("/api/admin/profit-insights", async (req, res) => {
-  try {
-    const [activeShiftRows] = await db.promise().query(
-      "SELECT id, name, started_at FROM shifts WHERE is_active = 1 LIMIT 1"
-    );
-
-    if (!activeShiftRows.length) {
-      return res.json({
-        activeShift: null,
-        topProfitable: null,
-        leastProfitable: null,
-        averageMargin: 0,
-        totalProfit: 0,
-        dailyRevenue: []
-      });
-    }
-
-    const activeShift = activeShiftRows[0];
-    const shiftId = activeShift.id;
-
-    const [top] = await db.promise().query(
-      `SELECT p.name, SUM(oi.profit) AS total_profit
-       FROM order_items oi
-       JOIN products p ON p.id = oi.product_id
-       JOIN orders o ON o.id = oi.order_id
-       WHERE o.shift_id = ?
-       GROUP BY p.id, p.name
-       ORDER BY total_profit DESC
-       LIMIT 1`,
-      [shiftId]
-    );
-
-    const [least] = await db.promise().query(
-      `SELECT p.name, SUM(oi.profit) AS total_profit
-       FROM order_items oi
-       JOIN products p ON p.id = oi.product_id
-       JOIN orders o ON o.id = oi.order_id
-       WHERE o.shift_id = ?
-       GROUP BY p.id, p.name
-       ORDER BY total_profit ASC
-       LIMIT 1`,
-      [shiftId]
-    );
-
-    const [margin] = await db.promise().query(
-      `SELECT ROUND(AVG((oi.profit / NULLIF(oi.subtotal, 0)) * 100), 2) AS avg_margin
-       FROM order_items oi
-       JOIN orders o ON o.id = oi.order_id
-       WHERE o.shift_id = ?`,
-      [shiftId]
-    );
-
-    const [totalProfit] = await db.promise().query(
-      `SELECT ROUND(SUM(oi.profit), 2) AS total_profit
-       FROM order_items oi
-       JOIN orders o ON o.id = oi.order_id
-       WHERE o.shift_id = ?`,
-      [shiftId]
-    );
-
-    const [dailyRevenue] = await db.promise().query(`
-      SELECT DATE(created_at) AS day, SUM(total) AS revenue
-      FROM orders
-      GROUP BY DATE(created_at)
-      ORDER BY day DESC
-    `);
-
-    const [shiftRevenue] = await db.promise().query(
-      `SELECT ROUND(SUM(total), 2) AS total_revenue
-       FROM orders
-       WHERE shift_id = ?`,
-      [shiftId]
-    );
-
-    res.json({
-      activeShift,
-      topProfitable: top[0] || null,
-      leastProfitable: least[0] || null,
-      averageMargin: margin[0]?.avg_margin || 0,
-      totalProfit: totalProfit[0]?.total_profit || 0,
-      totalRevenue: shiftRevenue[0]?.total_revenue || 0,
-      dailyRevenue: dailyRevenue || []
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to fetch profit insights" });
-  }
-});
-
-/* ================= START ================= */
-
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-app.delete("/api/admin/reset-dashboard", (req, res) => {
-  db.beginTransaction((err) => {
-    if (err) {
-      return res.status(500).json({ success: false, message: "Transaction start failed" });
-    }
-
-    db.query(
-      "SELECT id FROM orders WHERE DATE(created_at) = CURDATE()",
-      (err, todayOrders) => {
-        if (err) {
-          return db.rollback(() => {
-            res.status(500).json({ success: false, message: "Failed to get today's orders" });
-          });
-        }
-
-        if (todayOrders.length === 0) {
-          return db.commit((err) => {
-            if (err) {
-              return db.rollback(() => {
-                res.status(500).json({ success: false, message: "Commit failed" });
-              });
-            }
-
-            res.json({
-              success: true,
-              message: "No orders found for today"
-            });
-          });
-        }
-
-        const orderIds = todayOrders.map((o) => o.id);
-
-        db.query(
-          "DELETE FROM order_items WHERE order_id IN (?)",
-          [orderIds],
-          (err) => {
-            if (err) {
-              return db.rollback(() => {
-                res.status(500).json({ success: false, message: "Failed to delete today's order items" });
-              });
-            }
-
-            db.query(
-              "DELETE FROM orders WHERE id IN (?)",
-              [orderIds],
-              (err) => {
-                if (err) {
-                  return db.rollback(() => {
-                    res.status(500).json({ success: false, message: "Failed to delete today's orders" });
-                  });
-                }
-
-                db.commit((err) => {
-                  if (err) {
-                    return db.rollback(() => {
-                      res.status(500).json({ success: false, message: "Commit failed" });
-                    });
-                  }
-
-                  res.json({
-                    success: true,
-                    message: "Today's dashboard data reset successfully"
-                  });
-                });
-              }
-            );
-          }
-        );
-      }
-    );
-  });
-});
 app.post("/api/admin/new-shift", (req, res) => {
   db.beginTransaction((err) => {
     if (err) {
@@ -931,3 +500,497 @@ app.post("/api/admin/new-shift", (req, res) => {
     );
   });
 });
+
+/* ================= ORDERS - CREATE PENDING ================= */
+
+app.post("/api/orders", (req, res) => {
+  const { items } = req.body;
+
+  if (!items || !Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ success: false, message: "No order items provided" });
+  }
+
+  db.beginTransaction((err) => {
+    if (err) {
+      return res.status(500).json({ success: false, message: "Transaction error" });
+    }
+
+    db.query("SELECT id FROM shifts WHERE is_active = 1 LIMIT 1", (err, shiftRows) => {
+      if (err) {
+        return db.rollback(() => {
+          res.status(500).json({ success: false, message: "Failed to fetch active shift" });
+        });
+      }
+
+      if (!shiftRows.length) {
+        return db.rollback(() => {
+          res.status(400).json({ success: false, message: "No active shift found. Start a shift first." });
+        });
+      }
+
+      const activeShiftId = shiftRows[0].id;
+      const productIds = items.map((item) => item.product_id);
+
+      db.query(
+        "SELECT id, price, name FROM products WHERE id IN (?)",
+        [productIds],
+        (err, products) => {
+          if (err) {
+            return db.rollback(() => {
+              res.status(500).json({ success: false, message: "Database error" });
+            });
+          }
+
+          const productMap = {};
+          products.forEach((p) => {
+            productMap[p.id] = p;
+          });
+
+          let total = 0;
+
+          for (const item of items) {
+            const product = productMap[item.product_id];
+            if (!product) {
+              return db.rollback(() => {
+                res.status(400).json({
+                  success: false,
+                  message: `Product not found: ${item.product_id}`
+                });
+              });
+            }
+
+            total += Number(product.price) * Number(item.quantity);
+          }
+
+          db.query(
+            "INSERT INTO orders (total, shift_id, status) VALUES (?, ?, 'pending')",
+            [total, activeShiftId],
+            (err, orderResult) => {
+              if (err) {
+                return db.rollback(() => {
+                  console.log("INSERT ORDER ERROR:", err);
+                  res.status(500).json({ success: false, message: "Failed to create order" });
+                });
+              }
+
+              const orderId = orderResult.insertId;
+
+              db.query(
+                `SELECT 
+                  pi.product_id,
+                  SUM(pi.quantity * i.price) AS cost
+                 FROM product_ingredients pi
+                 JOIN ingredients i ON pi.ingredient_id = i.id
+                 WHERE pi.product_id IN (?)
+                 GROUP BY pi.product_id`,
+                [productIds],
+                (err, costRows) => {
+                  if (err) {
+                    return db.rollback(() => {
+                      res.status(500).json({ success: false, message: "Failed to fetch costs" });
+                    });
+                  }
+
+                  const costMap = {};
+                  costRows.forEach((row) => {
+                    costMap[row.product_id] = Number(row.cost || 0);
+                  });
+
+                  const orderItemsValues = items.map((item) => {
+                    const product = productMap[item.product_id];
+                    const price = Number(product.price);
+                    const quantity = Number(item.quantity);
+                    const cost = Number(costMap[item.product_id] || 0);
+                    const subtotal = price * quantity;
+                    const profit = (price - cost) * quantity;
+
+                    return [
+                      orderId,
+                      item.product_id,
+                      quantity,
+                      price,
+                      cost,
+                      subtotal,
+                      profit
+                    ];
+                  });
+
+                  db.query(
+                    `INSERT INTO order_items
+                     (order_id, product_id, quantity, price, cost, subtotal, profit)
+                     VALUES ?`,
+                    [orderItemsValues],
+                    (err) => {
+                      if (err) {
+                        return db.rollback(() => {
+                          console.log("INSERT ORDER ITEMS ERROR:", err);
+                          res.status(500).json({ success: false, message: "Failed to save order items" });
+                        });
+                      }
+
+                      db.commit((err) => {
+                        if (err) {
+                          return db.rollback(() => {
+                            res.status(500).json({ success: false, message: "Commit failed" });
+                          });
+                        }
+
+                        res.json({
+                          success: true,
+                          message: "Order placed successfully and is now pending",
+                          order_id: orderId,
+                          total
+                        });
+                      });
+                    }
+                  );
+                }
+              );
+            }
+          );
+        }
+      );
+    });
+  });
+});
+
+/* ================= PENDING ORDERS ================= */
+
+app.get("/api/admin/pending-orders", (req, res) => {
+  db.query(
+    `SELECT 
+      o.id AS order_id,
+      o.total,
+      o.created_at,
+      oi.id,
+      oi.product_id,
+      oi.quantity,
+      oi.price,
+      oi.subtotal,
+      p.name AS product_name
+     FROM orders o
+     JOIN order_items oi ON o.id = oi.order_id
+     JOIN products p ON p.id = oi.product_id
+     WHERE o.status = 'pending'
+     ORDER BY o.id DESC, oi.id ASC`,
+    (err, rows) => {
+      if (err) {
+        console.log("PENDING ORDERS ERROR:", err);
+        return res.status(500).json([]);
+      }
+
+      const grouped = {};
+      rows.forEach((row) => {
+        if (!grouped[row.order_id]) {
+          grouped[row.order_id] = {
+            id: row.order_id,
+            total: row.total,
+            created_at: row.created_at,
+            items: []
+          };
+        }
+
+        grouped[row.order_id].items.push({
+          id: row.id,
+          product_id: row.product_id,
+          product_name: row.product_name,
+          quantity: row.quantity,
+          price: row.price,
+          subtotal: row.subtotal
+        });
+      });
+
+      res.json(Object.values(grouped));
+    }
+  );
+});
+
+/* ================= COMPLETE ORDER ================= */
+
+app.put("/api/admin/orders/:id/complete", (req, res) => {
+  const orderId = req.params.id;
+
+  db.beginTransaction((err) => {
+    if (err) {
+      return res.status(500).json({ success: false, message: "Transaction error" });
+    }
+
+    db.query(
+      "SELECT * FROM orders WHERE id = ? AND status = 'pending' LIMIT 1",
+      [orderId],
+      (err, orderRows) => {
+        if (err) {
+          return db.rollback(() => {
+            res.status(500).json({ success: false, message: "Failed to fetch order" });
+          });
+        }
+
+        if (!orderRows.length) {
+          return db.rollback(() => {
+            res.status(404).json({ success: false, message: "Pending order not found" });
+          });
+        }
+
+        db.query(
+          `SELECT 
+            oi.product_id,
+            oi.quantity,
+            p.name AS product_name
+           FROM order_items oi
+           JOIN products p ON p.id = oi.product_id
+           WHERE oi.order_id = ?`,
+          [orderId],
+          (err, orderItems) => {
+            if (err) {
+              return db.rollback(() => {
+                res.status(500).json({ success: false, message: "Failed to fetch order items" });
+              });
+            }
+
+            if (!orderItems.length) {
+              return db.rollback(() => {
+                res.status(400).json({ success: false, message: "Order has no items" });
+              });
+            }
+
+            const productIds = orderItems.map((item) => item.product_id);
+
+            db.query(
+              `SELECT 
+                pi.product_id,
+                pi.ingredient_id,
+                pi.quantity AS recipe_qty,
+                i.stock,
+                i.name AS ingredient_name
+               FROM product_ingredients pi
+               JOIN ingredients i ON pi.ingredient_id = i.id
+               WHERE pi.product_id IN (?)`,
+              [productIds],
+              (err, recipeRows) => {
+                if (err) {
+                  return db.rollback(() => {
+                    res.status(500).json({ success: false, message: "Failed to fetch recipe data" });
+                  });
+                }
+
+                const stockUpdates = [];
+
+                for (const item of orderItems) {
+                  const matchingRecipes = recipeRows.filter(
+                    (r) => Number(r.product_id) === Number(item.product_id)
+                  );
+
+                  for (const recipe of matchingRecipes) {
+                    const deduction = Number(recipe.recipe_qty) * Number(item.quantity);
+                    const newStock = Number(recipe.stock) - deduction;
+
+                    if (newStock < 0) {
+                      return db.rollback(() => {
+                        res.status(400).json({
+                          success: false,
+                          message: `Not enough stock for ingredient: ${recipe.ingredient_name}`
+                        });
+                      });
+                    }
+
+                    stockUpdates.push({
+                      ingredient_id: recipe.ingredient_id,
+                      deduction
+                    });
+                  }
+                }
+
+                const mergedUpdates = {};
+
+                stockUpdates.forEach((u) => {
+                  if (!mergedUpdates[u.ingredient_id]) {
+                    mergedUpdates[u.ingredient_id] = 0;
+                  }
+                  mergedUpdates[u.ingredient_id] += u.deduction;
+                });
+
+                const updateEntries = Object.entries(mergedUpdates);
+
+                const finalizeOrder = () => {
+                  db.query(
+                    "UPDATE orders SET status = 'completed' WHERE id = ?",
+                    [orderId],
+                    (err) => {
+                      if (err) {
+                        return db.rollback(() => {
+                          res.status(500).json({ success: false, message: "Failed to complete order" });
+                        });
+                      }
+
+                      db.commit((err) => {
+                        if (err) {
+                          return db.rollback(() => {
+                            res.status(500).json({ success: false, message: "Commit failed" });
+                          });
+                        }
+
+                        res.json({
+                          success: true,
+                          message: `Order #${orderId} completed successfully`
+                        });
+                      });
+                    }
+                  );
+                };
+
+                if (updateEntries.length === 0) {
+                  return finalizeOrder();
+                }
+
+                let completed = 0;
+
+                updateEntries.forEach(([ingredientId, deduction]) => {
+                  db.query(
+                    "UPDATE ingredients SET stock = stock - ? WHERE id = ?",
+                    [deduction, ingredientId],
+                    (err) => {
+                      if (err) {
+                        return db.rollback(() => {
+                          res.status(500).json({ success: false, message: "Failed to update stock" });
+                        });
+                      }
+
+                      completed += 1;
+                      if (completed === updateEntries.length) {
+                        finalizeOrder();
+                      }
+                    }
+                  );
+                });
+              }
+            );
+          }
+        );
+      }
+    );
+  });
+});
+
+/* ================= VOID ORDER ================= */
+
+app.put("/api/admin/orders/:id/void", (req, res) => {
+  const orderId = req.params.id;
+
+  db.query(
+    "UPDATE orders SET status = 'voided' WHERE id = ? AND status = 'pending'",
+    [orderId],
+    (err, result) => {
+      if (err) {
+        console.log("VOID ORDER ERROR:", err);
+        return res.status(500).json({ success: false, message: "Failed to void order" });
+      }
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ success: false, message: "Pending order not found" });
+      }
+
+      res.json({
+        success: true,
+        message: `Order #${orderId} voided successfully`
+      });
+    }
+  );
+});
+
+/* ================= PROFIT INSIGHTS ================= */
+
+app.get("/api/admin/profit-insights", async (req, res) => {
+  try {
+    const [activeShiftRows] = await db.promise().query(
+      "SELECT id, name, started_at FROM shifts WHERE is_active = 1 LIMIT 1"
+    );
+
+    if (!activeShiftRows.length) {
+      return res.json({
+        activeShift: null,
+        topProfitable: null,
+        leastProfitable: null,
+        averageMargin: 0,
+        totalProfit: 0,
+        totalRevenue: 0,
+        dailyRevenue: []
+      });
+    }
+
+    const activeShift = activeShiftRows[0];
+    const shiftId = activeShift.id;
+
+    const [top] = await db.promise().query(
+      `SELECT p.name, SUM(oi.profit) AS total_profit
+       FROM order_items oi
+       JOIN products p ON p.id = oi.product_id
+       JOIN orders o ON o.id = oi.order_id
+       WHERE o.shift_id = ? AND o.status = 'completed'
+       GROUP BY p.id, p.name
+       ORDER BY total_profit DESC
+       LIMIT 1`,
+      [shiftId]
+    );
+
+    const [least] = await db.promise().query(
+      `SELECT p.name, SUM(oi.profit) AS total_profit
+       FROM order_items oi
+       JOIN products p ON p.id = oi.product_id
+       JOIN orders o ON o.id = oi.order_id
+       WHERE o.shift_id = ? AND o.status = 'completed'
+       GROUP BY p.id, p.name
+       ORDER BY total_profit ASC
+       LIMIT 1`,
+      [shiftId]
+    );
+
+    const [margin] = await db.promise().query(
+      `SELECT ROUND(AVG((oi.profit / NULLIF(oi.subtotal, 0)) * 100), 2) AS avg_margin
+       FROM order_items oi
+       JOIN orders o ON o.id = oi.order_id
+       WHERE o.shift_id = ? AND o.status = 'completed'`,
+      [shiftId]
+    );
+
+    const [totalProfit] = await db.promise().query(
+      `SELECT ROUND(SUM(oi.profit), 2) AS total_profit
+       FROM order_items oi
+       JOIN orders o ON o.id = oi.order_id
+       WHERE o.shift_id = ? AND o.status = 'completed'`,
+      [shiftId]
+    );
+
+    const [shiftRevenue] = await db.promise().query(
+      `SELECT ROUND(SUM(total), 2) AS total_revenue
+       FROM orders
+       WHERE shift_id = ? AND status = 'completed'`,
+      [shiftId]
+    );
+
+    const [dailyRevenue] = await db.promise().query(
+      `SELECT DATE(created_at) AS day, SUM(total) AS revenue
+       FROM orders
+       WHERE status = 'completed'
+       GROUP BY DATE(created_at)
+       ORDER BY day DESC`
+    );
+
+    res.json({
+      activeShift,
+      topProfitable: top[0] || null,
+      leastProfitable: least[0] || null,
+      averageMargin: margin[0]?.avg_margin || 0,
+      totalProfit: totalProfit[0]?.total_profit || 0,
+      totalRevenue: shiftRevenue[0]?.total_revenue || 0,
+      dailyRevenue: dailyRevenue || []
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch profit insights" });
+  }
+});
+
+/* ================= START ================= */
+
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

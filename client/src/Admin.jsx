@@ -1,47 +1,27 @@
 import { useState, useEffect } from "react";
 import Navbar from "./Navbar";
 import Sidebar from "./Sidebar";
+
 const API = "http://localhost:5000";
 
 export default function Admin() {
-  const [tab, setTab] = useState("products");
+  const [tab, setTab] = useState("dashboard");
   const [products, setProducts] = useState([]);
   const [ingredients, setIngredients] = useState([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const newShift = async () => {
-    if (!window.confirm("Start a new shift? Current dashboard values will move to history.")) return;
+  const [pendingOrders, setPendingOrders] = useState([]);
 
-    try {
-      const res = await fetch(`${API}/api/admin/new-shift`, {
-        method: "POST"
-      });
-
-      const data = await res.json();
-      alert(data.message);
-
-      fetchProducts();
-      fetchIngredients();
-      fetchCostingAnalysis();
-      fetchProfitInsights();
-    } catch (err) {
-      console.error("New shift error:", err);
-    }
-  };
-
-  // Product Form States
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
   const [price, setPrice] = useState("");
   const [image, setImage] = useState(null);
 
-  // Ingredient Form States
   const [ingredientName, setIngredientName] = useState("");
   const [ingUnit, setIngUnit] = useState("pcs");
   const [stock, setStock] = useState("");
   const [ingPrice, setIngPrice] = useState("");
 
-  // Costing Analysis States
   const [selectedProductId, setSelectedProductId] = useState("");
   const [selectedIngredientId, setSelectedIngredientId] = useState("");
   const [recipeQuantity, setRecipeQuantity] = useState("");
@@ -49,7 +29,6 @@ export default function Admin() {
   const [productRecipe, setProductRecipe] = useState([]);
   const [costingAnalysis, setCostingAnalysis] = useState([]);
 
-  // Profit Insights
   const [insights, setInsights] = useState({
     activeShift: null,
     topProfitable: null,
@@ -60,7 +39,6 @@ export default function Admin() {
     dailyRevenue: []
   });
 
-  /* ================= HELPERS ================= */
   const getIngredientById = (id) => {
     return ingredients.find((i) => String(i.id) === String(id));
   };
@@ -76,12 +54,8 @@ export default function Admin() {
 
     if (isNaN(qty)) return null;
     if (fromUnit === toUnit) return qty;
-
-    // volume
     if (fromUnit === "mL" && toUnit === "L") return qty / 1000;
     if (fromUnit === "L" && toUnit === "mL") return qty * 1000;
-
-    // weight
     if (fromUnit === "g" && toUnit === "kg") return qty / 1000;
     if (fromUnit === "kg" && toUnit === "g") return qty * 1000;
 
@@ -144,7 +118,6 @@ export default function Admin() {
     };
   })();
 
-  /* ================= FETCH LOGIC ================= */
   const fetchProducts = async () => {
     try {
       const res = await fetch(`${API}/api/products`);
@@ -208,14 +181,73 @@ export default function Admin() {
     }
   };
 
-  useEffect(() => {
+  const fetchPendingOrders = async () => {
+    try {
+      const res = await fetch(`${API}/api/admin/pending-orders`);
+      const data = await res.json();
+      setPendingOrders(data);
+    } catch (err) {
+      console.error("Fetch pending orders error:", err);
+    }
+  };
+
+  const refreshAll = () => {
     fetchProducts();
     fetchIngredients();
     fetchCostingAnalysis();
     fetchProfitInsights();
+    fetchPendingOrders();
+  };
+
+  useEffect(() => {
+    refreshAll();
   }, []);
 
-  /* ================= PRODUCT ACTIONS ================= */
+  const newShift = async () => {
+    if (!window.confirm("Start a new shift? Current shift dashboard will stay in history.")) return;
+
+    try {
+      const res = await fetch(`${API}/api/admin/new-shift`, {
+        method: "POST"
+      });
+      const data = await res.json();
+      alert(data.message);
+      refreshAll();
+    } catch (err) {
+      console.error("New shift error:", err);
+    }
+  };
+
+  const completeOrder = async (orderId) => {
+    if (!window.confirm(`Complete order #${orderId}?`)) return;
+
+    try {
+      const res = await fetch(`${API}/api/admin/orders/${orderId}/complete`, {
+        method: "PUT"
+      });
+      const data = await res.json();
+      alert(data.message);
+      refreshAll();
+    } catch (err) {
+      console.error("Complete order error:", err);
+    }
+  };
+
+  const voidOrder = async (orderId) => {
+    if (!window.confirm(`Void order #${orderId}?`)) return;
+
+    try {
+      const res = await fetch(`${API}/api/admin/orders/${orderId}/void`, {
+        method: "PUT"
+      });
+      const data = await res.json();
+      alert(data.message);
+      refreshAll();
+    } catch (err) {
+      console.error("Void order error:", err);
+    }
+  };
+
   const addProduct = async () => {
     if (!name.trim() || !category || !price) {
       return alert("Fill in name, category, and price");
@@ -239,7 +271,6 @@ export default function Admin() {
       setImage(null);
       fetchProducts();
       fetchCostingAnalysis();
-      fetchProfitInsights();
     }
   };
 
@@ -248,7 +279,6 @@ export default function Admin() {
       await fetch(`${API}/api/products/${id}`, { method: "DELETE" });
       fetchProducts();
       fetchCostingAnalysis();
-      fetchProfitInsights();
 
       if (String(selectedProductId) === String(id)) {
         setSelectedProductId("");
@@ -257,7 +287,6 @@ export default function Admin() {
     }
   };
 
-  /* ================= INGREDIENT ACTIONS ================= */
   const addIngredient = async () => {
     if (!ingredientName || !ingUnit || !stock || !ingPrice) {
       return alert("Fill all fields");
@@ -282,7 +311,6 @@ export default function Admin() {
         setIngPrice("");
         fetchIngredients();
         fetchCostingAnalysis();
-        fetchProfitInsights();
       }
     } catch (err) {
       console.error("Add ingredient error:", err);
@@ -316,7 +344,6 @@ export default function Admin() {
       await fetch(`${API}/api/ingredients/${id}`, { method: "DELETE" });
       fetchIngredients();
       fetchCostingAnalysis();
-      fetchProfitInsights();
 
       if (selectedProductId) {
         fetchProductRecipe(selectedProductId);
@@ -324,7 +351,6 @@ export default function Admin() {
     }
   };
 
-  /* ================= COSTING ACTIONS ================= */
   const addRecipeIngredient = async () => {
     if (!selectedProductId || !selectedIngredientId || !recipeQuantity || !recipeInputUnit) {
       return alert("Select product, ingredient, quantity, and unit");
@@ -342,7 +368,7 @@ export default function Admin() {
       );
 
       if (existing) {
-        return alert("This ingredient is already in the recipe. Delete it first if you want to change it.");
+        return alert("This ingredient is already in the recipe.");
       }
 
       const convertedQuantity = convertToBaseUnit(
@@ -375,7 +401,6 @@ export default function Admin() {
       setRecipeInputUnit("");
       fetchProductRecipe(selectedProductId);
       fetchCostingAnalysis();
-      fetchProfitInsights();
     } catch (err) {
       console.error("Add recipe ingredient error:", err);
     }
@@ -390,7 +415,6 @@ export default function Admin() {
       if (res.ok) {
         fetchProductRecipe(selectedProductId);
         fetchCostingAnalysis();
-        fetchProfitInsights();
       }
     } catch (err) {
       console.error("Delete recipe ingredient error:", err);
@@ -405,32 +429,9 @@ export default function Admin() {
       <main className="admin-content">
         <header className="admin-header">
           <h1>Admin Dashboard</h1>
-          <p>Manage your inventory and products seamlessly.</p>
+          <p>Manage your inventory, orders, and products seamlessly.</p>
 
           <nav className="tab-navigation">
-            <button
-              onClick={async () => {
-                const res = await fetch("http://localhost:5000/api/orders", {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json"
-                  },
-                  body: JSON.stringify({
-                    items: [{ product_id: 18, quantity: 1 }]
-                  })
-                });
-
-                const data = await res.json();
-                alert(data.message);
-
-                fetchIngredients();
-                fetchCostingAnalysis();
-                fetchProfitInsights();
-              }}
-            >
-              Test Order
-            </button>
-
             <button
               onClick={newShift}
               style={{
@@ -446,17 +447,26 @@ export default function Admin() {
             </button>
 
             <button
+              className={tab === "dashboard" ? "nav-btn active" : "nav-btn"}
+              onClick={() => setTab("dashboard")}
+            >
+              <span className="icon">📈</span> Dashboard
+            </button>
+
+            <button
               className={tab === "products" ? "nav-btn active" : "nav-btn"}
               onClick={() => setTab("products")}
             >
               <span className="icon">☕</span> Products
             </button>
+
             <button
               className={tab === "ingredients" ? "nav-btn active" : "nav-btn"}
               onClick={() => setTab("ingredients")}
             >
               <span className="icon">🌿</span> Ingredients
             </button>
+
             <button
               className={tab === "costing" ? "nav-btn active" : "nav-btn"}
               onClick={() => setTab("costing")}
@@ -466,145 +476,151 @@ export default function Admin() {
           </nav>
         </header>
 
-        <div className="glass-card" style={{ marginBottom: "20px" }}>
-          <div className="card-header">
-            <h2>Profit Insights Dashboard</h2>
-          </div>
-
-<div
-  style={{
-    display: "grid",
-    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-    gap: "12px",
-    marginBottom: "20px"
-  }}
->
-            <div style={{ padding: "16px", border: "1px solid #000", borderRadius: "12px", background: "#fbf9f7", minWidth: "180px", textAlign: "center"}}>
-              <h4>Active Shift</h4>
-              <p>{insights.activeShift?.name || "No Active Shift"}</p>
-            </div>
-
-
-            <div
-              style={{
-                padding: "16px",
-                border: "1px solid #000",
-                borderRadius: "12px",
-                background: "#eef4ff",
-                minWidth: "180px",
-                textAlign: "center"
-              }}
-            >
-              <h4>Top Profitable Product</h4>
-              <p>{insights.topProfitable?.name || "N/A"}</p>
-              <strong style={{ color: "#1565c0" }}>
-                ₱{Number(insights.topProfitable?.total_profit || 0).toFixed(2)}
-              </strong>
-            </div>
-
-            <div
-              style={{
-                padding: "16px",
-                border: "1px solid #000",
-                borderRadius: "12px",
-                background: "#fdecea",
-                minWidth: "180px",
-                textAlign: "center"
-
-              }}
-            >
-              <h4>Least Profitable Product</h4>
-              <p>{insights.leastProfitable?.name || "N/A"}</p>
-              <strong style={{ color: "#b3261e" }}>
-                ₱{Number(insights.leastProfitable?.total_profit || 0).toFixed(2)}
-              </strong>
-            </div>
-                        <div
-              style={{
-                padding: "16px",
-                border: "1px solid #000",
-                borderRadius: "12px",
-                background: "#fbf9f7",
-                minWidth: "180px",
-                textAlign: "center"
-              }}
-            >
-              <h4>Shift Revenue</h4>
-              <strong>₱{Number(insights.totalRevenue || 0).toFixed(2)}</strong>
-            </div>
-
-            <div
-              style={{
-                padding: "16px",
-                border: "1px solid #000",
-                borderRadius: "12px",
-                background: "#fbf9f7",
-                minWidth: "180px",
-                textAlign: "center"
-              }}
-            >
-              <h4>Average Margin</h4>
-              <p>{Number(insights.averageMargin || 0).toFixed(2)}%</p>
-            </div>
-
-            <div
-              style={{
-                padding: "16px",
-                border: "1px solid #000",
-                borderRadius: "12px",
-                background: "#eaf7ee",
-                minWidth: "180px",
-                textAlign: "center"
-              }}
-            >
-              <h4>Total Profit</h4>
-              <strong style={{ color: "#2e7d32" }}>
-                ₱{Number(insights.totalProfit || 0).toFixed(2)}
-              </strong>
-            </div>
-          </div>
-
-          <div style={{ marginTop: "20px" }}>
-            <h3>Total Revenue History Per Day</h3>
-
-            {insights.dailyRevenue.length === 0 ? (
-              <p>No revenue data yet.</p>
-            ) : (
-              <div className="table-wrapper">
-                <table className="black-border-table">
-                  <thead>
-                    <tr>
-                      <th>Date</th>
-                      <th>Total Revenue</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {insights.dailyRevenue.map((item, index) => (
-                      <tr key={index}>
-                        <td>
-                          {new Date(item.day).toLocaleDateString("en-PH", {
-                            year: "numeric",
-                            month: "long",
-                            day: "numeric"
-                          })}
-                        </td>
-                        <td className="price-tag">
-                          ₱{Number(item.revenue).toLocaleString(undefined, {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2
-                          })}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </div>
-
         <section className="main-section">
-          {tab === "products" ? (
+          {tab === "dashboard" ? (
+            <>
+              <div className="glass-card" style={{ marginBottom: "20px" }}>
+                <div className="card-header">
+                  <h2>Profit Insights Dashboard</h2>
+                </div>
+
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                    gap: "12px",
+                    marginBottom: "20px"
+                  }}
+                >
+                  <div style={dashboardCard}>
+                    <h4>Active Shift</h4>
+                    <p>{insights.activeShift?.name || "No Active Shift"}</p>
+                  </div>
+
+                  <div style={dashboardCard}>
+                    <h4>Shift Revenue</h4>
+                    <strong>₱{Number(insights.totalRevenue || 0).toFixed(2)}</strong>
+                  </div>
+
+                  <div style={{ ...dashboardCard, background: "#eef4ff" }}>
+                    <h4>Top Profitable</h4>
+                    <p>{insights.topProfitable?.name || "N/A"}</p>
+                    <strong style={{ color: "#1565c0" }}>
+                      ₱{Number(insights.topProfitable?.total_profit || 0).toFixed(2)}
+                    </strong>
+                  </div>
+
+                  <div style={{ ...dashboardCard, background: "#fdecea" }}>
+                    <h4>Least Profitable</h4>
+                    <p>{insights.leastProfitable?.name || "N/A"}</p>
+                    <strong style={{ color: "#b3261e" }}>
+                      ₱{Number(insights.leastProfitable?.total_profit || 0).toFixed(2)}
+                    </strong>
+                  </div>
+
+                  <div style={dashboardCard}>
+                    <h4>Average Margin</h4>
+                    <p>{Number(insights.averageMargin || 0).toFixed(2)}%</p>
+                  </div>
+
+                  <div style={{ ...dashboardCard, background: "#eaf7ee" }}>
+                    <h4>Total Profit</h4>
+                    <strong style={{ color: "#2e7d32" }}>
+                      ₱{Number(insights.totalProfit || 0).toFixed(2)}
+                    </strong>
+                  </div>
+                </div>
+
+                <div style={{ marginTop: "20px" }}>
+                  <h3>Total Revenue History Per Day</h3>
+
+                  {insights.dailyRevenue.length === 0 ? (
+                    <p>No revenue data yet.</p>
+                  ) : (
+                    <div className="table-wrapper">
+                      <table className="black-border-table">
+                        <thead>
+                          <tr>
+                            <th>Date</th>
+                            <th>Total Revenue</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {insights.dailyRevenue.map((item, index) => (
+                            <tr key={index}>
+                              <td>
+                                {new Date(item.day).toLocaleDateString("en-PH", {
+                                  year: "numeric",
+                                  month: "long",
+                                  day: "numeric"
+                                })}
+                              </td>
+                              <td className="price-tag">
+                                ₱{Number(item.revenue).toLocaleString(undefined, {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2
+                                })}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="glass-card" style={{ marginBottom: "20px" }}>
+                <div className="card-header">
+                  <h2>Pending Orders</h2>
+                </div>
+
+                {pendingOrders.length === 0 ? (
+                  <p style={{ textAlign: "center", padding: "14px 0" }}>No pending orders.</p>
+                ) : (
+                  <div className="pending-orders-grid">
+                    {pendingOrders.map((order) => (
+                      <div key={order.id} className="pending-order-card">
+                        <div className="pending-top">
+                          <div>
+                            <h3>Order #{order.id}</h3>
+                            <p>
+                              {new Date(order.created_at).toLocaleDateString("en-PH", {
+                                year: "numeric",
+                                month: "long",
+                                day: "numeric"
+                              })}
+                            </p>
+                          </div>
+                          <strong>₱{Number(order.total).toFixed(2)}</strong>
+                        </div>
+
+                        <div className="pending-items">
+                          {order.items.map((item) => (
+                            <div key={item.id} className="pending-item-row">
+                              <span>
+                                {item.product_name} x {item.quantity}
+                              </span>
+                              <span>₱{Number(item.subtotal || item.price * item.quantity).toFixed(2)}</span>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="pending-actions">
+                          <button className="btn-complete" onClick={() => completeOrder(order.id)}>
+                            Complete Order
+                          </button>
+                          <button className="btn-void" onClick={() => voidOrder(order.id)}>
+                            Void Order
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          ) : tab === "products" ? (
             <div className="glass-card">
               <div className="card-header"><h2>Product Management</h2></div>
 
@@ -833,25 +849,25 @@ export default function Admin() {
                   marginBottom: "20px"
                 }}
               >
-                <div style={{ padding: "16px", border: "1px solid #000", borderRadius: "12px", background: "#fbf9f7" }}>
+                <div style={smallCard}>
                   <h4>Highest Recipe Profit</h4>
                   <p>{profitInsights.topProfit?.name || "N/A"}</p>
                   <strong>₱{Number(profitInsights.topProfit?.profit || 0).toFixed(2)}</strong>
                 </div>
 
-                <div style={{ padding: "16px", border: "1px solid #000", borderRadius: "12px", background: "#fbf9f7" }}>
+                <div style={smallCard}>
                   <h4>Lowest Recipe Profit</h4>
                   <p>{profitInsights.lowProfit?.name || "N/A"}</p>
                   <strong>₱{Number(profitInsights.lowProfit?.profit || 0).toFixed(2)}</strong>
                 </div>
 
-                <div style={{ padding: "16px", border: "1px solid #000", borderRadius: "12px", background: "#fbf9f7" }}>
+                <div style={smallCard}>
                   <h4>Best Margin Product</h4>
                   <p>{profitInsights.topMargin?.name || "N/A"}</p>
                   <strong>{Number(profitInsights.topMargin?.margin || 0).toFixed(2)}%</strong>
                 </div>
 
-                <div style={{ padding: "16px", border: "1px solid #000", borderRadius: "12px", background: "#fbf9f7" }}>
+                <div style={smallCard}>
                   <h4>Average Recipe Margin</h4>
                   <strong>{Number(profitInsights.avgMargin || 0).toFixed(2)}%</strong>
                 </div>
@@ -1015,44 +1031,15 @@ export default function Admin() {
       </main>
 
       <style jsx>{`
-        .alert-summary {
-          margin-bottom: 1.5rem;
-          padding: 1rem 1.2rem;
-          border: 1px solid #000;
-          border-radius: 12px;
-          background: #fff8f2;
-        }
-
-        .alert-summary h3 {
-          margin: 0 0 6px 0;
-          color: #6b4f3a;
-        }
-
-        .alert-summary p {
-          margin: 0;
-          font-weight: 700;
-        }
-
-        .status-badge {
-          display: inline-block;
-          padding: 6px 12px;
-          border-radius: 999px;
-          font-size: 0.8rem;
-          font-weight: 800;
-        }
-
         .admin-container {
           background-color: #fff7f0;
-          background-size: cover;
-          background-position: center;
-          background-attachment: fixed;
           min-height: 100vh;
           font-family: 'Inter', system-ui, sans-serif;
           color: #4a3728;
         }
 
         .admin-content {
-          max-width: 1000px;
+          max-width: 1100px;
           margin: 0 auto;
           padding: 2rem 1rem;
         }
@@ -1100,6 +1087,14 @@ export default function Admin() {
           box-shadow: 0 10px 30px rgba(0,0,0,0.1);
         }
 
+        .card-header {
+          margin-bottom: 1rem;
+        }
+
+        .card-header h2 {
+          margin: 0;
+        }
+
         .form-group {
           display: flex;
           gap: 10px;
@@ -1130,6 +1125,38 @@ export default function Admin() {
           font-weight: 700;
         }
 
+        .btn-danger {
+          background: #b3261e;
+          color: white;
+          padding: 8px 14px;
+          border: none;
+          border-radius: 8px;
+          cursor: pointer;
+          font-weight: 700;
+        }
+
+        .btn-complete {
+          background: #2e7d32;
+          color: white;
+          padding: 10px 14px;
+          border: none;
+          border-radius: 10px;
+          cursor: pointer;
+          font-weight: 700;
+          flex: 1;
+        }
+
+        .btn-void {
+          background: #b3261e;
+          color: white;
+          padding: 10px 14px;
+          border: none;
+          border-radius: 10px;
+          cursor: pointer;
+          font-weight: 700;
+          flex: 1;
+        }
+
         .black-border-table {
           width: 100%;
           border-collapse: collapse;
@@ -1146,6 +1173,10 @@ export default function Admin() {
         .black-border-table th {
           background: #f2ede9;
           font-size: 0.85rem;
+        }
+
+        .table-wrapper {
+          overflow-x: auto;
         }
 
         .table-img {
@@ -1174,16 +1205,6 @@ export default function Admin() {
         .total-val {
           font-weight: 800;
           color: #6b4f3a;
-        }
-
-        .btn-danger {
-          background: #b3261e;
-          color: white;
-          padding: 8px 14px;
-          border: none;
-          border-radius: 8px;
-          cursor: pointer;
-          font-weight: 700;
         }
 
         .stock-control {
@@ -1233,6 +1254,32 @@ export default function Admin() {
           color: #2e7d32;
         }
 
+        .alert-summary {
+          margin-bottom: 1.5rem;
+          padding: 1rem 1.2rem;
+          border: 1px solid #000;
+          border-radius: 12px;
+          background: #fff8f2;
+        }
+
+        .alert-summary h3 {
+          margin: 0 0 6px 0;
+          color: #6b4f3a;
+        }
+
+        .alert-summary p {
+          margin: 0;
+          font-weight: 700;
+        }
+
+        .status-badge {
+          display: inline-block;
+          padding: 6px 12px;
+          border-radius: 999px;
+          font-size: 0.8rem;
+          font-weight: 800;
+        }
+
         .file-input {
           display: none;
         }
@@ -1247,6 +1294,64 @@ export default function Admin() {
           font-weight: 700;
         }
 
+        .pending-orders-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+          gap: 16px;
+        }
+
+        .pending-order-card {
+          border: 1px solid #000;
+          border-radius: 16px;
+          padding: 16px;
+          background: #fbf9f7;
+        }
+
+        .pending-top {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 10px;
+          margin-bottom: 12px;
+        }
+
+        .pending-top h3 {
+          margin: 0 0 6px 0;
+        }
+
+        .pending-top p {
+          margin: 0;
+          color: #7a6a5c;
+          font-size: 0.9rem;
+        }
+
+        .pending-items {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          margin-bottom: 14px;
+        }
+
+        .pending-item-row {
+          display: flex;
+          justify-content: space-between;
+          gap: 10px;
+          font-size: 0.95rem;
+          border-bottom: 1px dashed #ddd;
+          padding-bottom: 6px;
+        }
+
+        .pending-actions {
+          display: flex;
+          gap: 10px;
+        }
+
+        @media (max-width: 900px) {
+          .admin-content {
+            max-width: 100%;
+          }
+        }
+
         @media (max-width: 768px) {
           .form-group {
             flex-direction: column;
@@ -1256,11 +1361,30 @@ export default function Admin() {
             width: 100%;
           }
 
-          .table-wrapper {
-            overflow-x: auto;
+          .pending-actions {
+            flex-direction: column;
+          }
+
+          .tab-navigation {
+            gap: 0.5rem;
           }
         }
       `}</style>
     </div>
   );
 }
+
+const dashboardCard = {
+  padding: "16px",
+  border: "1px solid #000",
+  borderRadius: "12px",
+  background: "#fbf9f7",
+  textAlign: "center"
+};
+
+const smallCard = {
+  padding: "16px",
+  border: "1px solid #000",
+  borderRadius: "12px",
+  background: "#fbf9f7"
+};

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Navbar from "./Navbar";
 import Sidebar from "./Sidebar";
 
@@ -8,6 +8,8 @@ export default function Menu() {
   const [products, setProducts] = useState([]);
   const [activeCategory, setActiveCategory] = useState("All");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [cart, setCart] = useState([]);
+  const [placingOrder, setPlacingOrder] = useState(false);
 
   const categories = [
     "All",
@@ -23,17 +25,97 @@ export default function Menu() {
   useEffect(() => {
     fetch(`${API}/api/products`)
       .then((res) => res.json())
-      .then(setProducts);
+      .then(setProducts)
+      .catch((err) => console.error("Fetch products error:", err));
   }, []);
 
-  const filteredProducts = activeCategory === "All"
-    ? products
-    : products.filter(p => p.category === activeCategory);
+  const filteredProducts =
+    activeCategory === "All"
+      ? products
+      : products.filter((p) => p.category === activeCategory);
+
+  const addToCart = (product) => {
+    setCart((prev) => {
+      const existing = prev.find((item) => item.id === product.id);
+      if (existing) {
+        return prev.map((item) =>
+          item.id === product.id
+            ? { ...item, quantity: item.quantity + 1 }
+            : item
+        );
+      }
+      return [...prev, { ...product, quantity: 1 }];
+    });
+  };
+
+  const increaseQty = (id) => {
+    setCart((prev) =>
+      prev.map((item) =>
+        item.id === id ? { ...item, quantity: item.quantity + 1 } : item
+      )
+    );
+  };
+
+  const decreaseQty = (id) => {
+    setCart((prev) =>
+      prev
+        .map((item) =>
+          item.id === id ? { ...item, quantity: item.quantity - 1 } : item
+        )
+        .filter((item) => item.quantity > 0)
+    );
+  };
+
+  const removeFromCart = (id) => {
+    setCart((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const cartTotal = useMemo(() => {
+    return cart.reduce(
+      (sum, item) => sum + Number(item.price) * Number(item.quantity),
+      0
+    );
+  }, [cart]);
+
+  const placeOrder = async () => {
+    if (cart.length === 0) {
+      return alert("Cart is empty.");
+    }
+
+    try {
+      setPlacingOrder(true);
+
+      const res = await fetch(`${API}/api/orders`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          items: cart.map((item) => ({
+            product_id: item.id,
+            quantity: item.quantity
+          }))
+        })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        return alert(data.message || "Failed to place order");
+      }
+
+      alert(`Order queued successfully. Order #${data.order_id}`);
+      setCart([]);
+    } catch (err) {
+      console.error("Place order error:", err);
+      alert("Failed to place order");
+    } finally {
+      setPlacingOrder(false);
+    }
+  };
 
   return (
     <div className="page-wrapper">
-
-
       <div className="content-spacing">
         <div className="main-content-card">
           <header className="menu-header">
@@ -54,30 +136,94 @@ export default function Menu() {
             </div>
           </header>
 
-          <main className="product-grid">
-            {filteredProducts.map((p) => (
-              <div key={p.id} className="product-card">
-                <div className="image-container">
-                  <img
-                    src={p.image ? API + p.image : "/placeholder.png"}
-                    alt={p.name}
-                  />
+          <div className="menu-layout">
+            <main className="product-grid">
+              {filteredProducts.map((p) => (
+                <div key={p.id} className="product-card">
+                  <div className="image-container">
+                    <img
+                      src={p.image ? API + p.image : "/placeholder.png"}
+                      alt={p.name}
+                    />
+                  </div>
+                  <div className="product-info">
+                    <h3>{p.name}</h3>
+                    <p className="price">₱{Number(p.price).toLocaleString()}</p>
+                    <p className="description">
+                      {p.description || "A delicious blend of premium ingredients."}
+                    </p>
+                    <button className="order-btn" onClick={() => addToCart(p)}>
+                      Add to Order
+                    </button>
+                  </div>
                 </div>
-                <div className="product-info">
-                  <h3>{p.name}</h3>
-                  <p className="price">₱{Number(p.price).toLocaleString()}</p>
-                  <p className="description">
-                    {p.description || "A delicious blend of premium ingredients."}
-                  </p>
-                  <button className="order-btn">Add to Order</button>
-                </div>
-              </div>
-            ))}
-          </main>
+              ))}
 
-          {filteredProducts.length === 0 && (
-            <p className="no-products">No items found in this category.</p>
-          )}
+              {filteredProducts.length === 0 && (
+                <p className="no-products">No items found in this category.</p>
+              )}
+            </main>
+
+            <aside className="cart-panel">
+              <div className="cart-header">
+                <h2>Current Order</h2>
+                <span>{cart.length} item(s)</span>
+              </div>
+
+              {cart.length === 0 ? (
+                <p className="empty-cart">No items added yet.</p>
+              ) : (
+                <>
+                  <div className="cart-items">
+                    {cart.map((item) => (
+                      <div key={item.id} className="cart-item">
+                        <div className="cart-item-info">
+                          <h4>{item.name}</h4>
+                          <p>₱{Number(item.price).toFixed(2)}</p>
+                        </div>
+
+                        <div className="qty-controls">
+                          <button onClick={() => decreaseQty(item.id)}>-</button>
+                          <span>{item.quantity}</span>
+                          <button onClick={() => increaseQty(item.id)}>+</button>
+                        </div>
+
+                        <div className="cart-item-right">
+                          <strong>
+                            ₱
+                            {(
+                              Number(item.price) * Number(item.quantity)
+                            ).toFixed(2)}
+                          </strong>
+                          <button
+                            className="remove-btn"
+                            onClick={() => removeFromCart(item.id)}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="cart-footer">
+                    <div className="cart-total">
+                      <span>Total</span>
+                      <strong>₱{cartTotal.toFixed(2)}</strong>
+                    </div>
+
+                    <button
+                      className="checkout-btn"
+                      onClick={placeOrder}
+                      disabled={placingOrder}
+                    >
+                      {placingOrder ? "Placing Order..." : "Place Order"}
+                    </button>
+                  </div>
+                </>
+              )}
+            </aside>
+          </div>
         </div>
       </div>
 
@@ -98,7 +244,7 @@ export default function Menu() {
 
         .main-content-card {
           width: 100%;
-          max-width: 1200px;
+          max-width: 1350px;
           background: rgba(255, 255, 255, 0.95);
           backdrop-filter: blur(10px);
           border-radius: 30px;
@@ -166,6 +312,13 @@ export default function Menu() {
           box-shadow: 0 4px 12px rgba(45, 36, 30, 0.2);
         }
 
+        .menu-layout {
+          display: grid;
+          grid-template-columns: 1fr 340px;
+          gap: 24px;
+          align-items: start;
+        }
+
         .product-grid {
           display: grid;
           grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
@@ -228,7 +381,8 @@ export default function Menu() {
           overflow: hidden;
         }
 
-        .order-btn {
+        .order-btn,
+        .checkout-btn {
           width: 100%;
           background: #2d241e;
           color: white;
@@ -240,14 +394,126 @@ export default function Menu() {
           transition: background 0.3s;
         }
 
-        .order-btn:hover {
+        .order-btn:hover,
+        .checkout-btn:hover {
           background: #bc8a5f;
         }
 
+        .checkout-btn:disabled {
+          background: #a79a91;
+          cursor: not-allowed;
+        }
+
+        .cart-panel {
+          background: #ffffff;
+          border: 1px solid #f0e7e0;
+          border-radius: 20px;
+          padding: 20px;
+          position: sticky;
+          top: 20px;
+          box-shadow: 0 10px 24px rgba(0,0,0,0.06);
+        }
+
+        .cart-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 16px;
+        }
+
+        .cart-header h2 {
+          margin: 0;
+          color: #2d241e;
+          font-size: 1.3rem;
+        }
+
+        .empty-cart,
         .no-products {
           text-align: center;
           color: #888;
-          padding: 40px;
+          padding: 20px;
+        }
+
+        .cart-items {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          max-height: 460px;
+          overflow-y: auto;
+          margin-bottom: 16px;
+        }
+
+        .cart-item {
+          border: 1px solid #eee;
+          border-radius: 14px;
+          padding: 12px;
+          display: grid;
+          gap: 10px;
+        }
+
+        .cart-item-info h4 {
+          margin: 0 0 4px 0;
+          font-size: 1rem;
+        }
+
+        .cart-item-info p {
+          margin: 0;
+          color: #8a6c54;
+          font-weight: 700;
+        }
+
+        .qty-controls {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .qty-controls button {
+          width: 30px;
+          height: 30px;
+          border: none;
+          border-radius: 8px;
+          background: #2d241e;
+          color: white;
+          cursor: pointer;
+        }
+
+        .cart-item-right {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+        }
+
+        .remove-btn {
+          background: transparent;
+          color: #b3261e;
+          border: none;
+          font-weight: 700;
+          cursor: pointer;
+        }
+
+        .cart-footer {
+          border-top: 1px solid #eee;
+          padding-top: 16px;
+        }
+
+        .cart-total {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 14px;
+          font-size: 1.1rem;
+        }
+
+        @media (max-width: 992px) {
+          .menu-layout {
+            grid-template-columns: 1fr;
+          }
+
+          .cart-panel {
+            position: static;
+          }
         }
 
         @media (max-width: 768px) {
