@@ -1,9 +1,8 @@
-// client/src/Login.jsx
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "./Navbar";
 import Sidebar from "./Sidebar";
-const API = "http://localhost:5000";
+import { loginUser, getUserRole } from "./auth";
 
 export default function Login({ setIsAdminLoggedIn }) {
   const [username, setUsername] = useState("");
@@ -13,57 +12,43 @@ export default function Login({ setIsAdminLoggedIn }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const navigate = useNavigate();
 
-const handleLogin = async (e) => {
-  e.preventDefault();
-  setError("");
-  try {
-    setLoading(true);
-    const res = await fetch(`${API}/api/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password }),
-    });
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setError("");
 
-    if (!res.ok) {
-      setError("Invalid username or password");
-      return;
+    try {
+      setLoading(true);
+
+      const user = await loginUser(username, password);
+      const role = await getUserRole(user.uid);
+
+      if (role !== "admin") {
+        setError("You are not an admin.");
+        return;
+      }
+
+      setIsAdminLoggedIn(true);
+      navigate("/admin");
+    } catch (err) {
+      console.error(err);
+      setError("Invalid email or password");
+    } finally {
+      setLoading(false);
     }
+  };
 
-    const data = await res.json();
-
-    // STEP 1: Save the flag to the browser's permanent memory
-    localStorage.setItem("isLoggedIn", "true"); 
-    if (data.token) localStorage.setItem("adminToken", data.token);
-
-    // STEP 2: Tell React state you are logged in
-    setIsAdminLoggedIn(true);
-
-    // STEP 3: Now move to the admin page
-    navigate("/admin");
-  } catch (err) {
-    setError("Server error.");
-  } finally {
-    setLoading(false);
-  }
-};
-  
-return (
-
-
-
+  return (
     <div style={styles.pageWrapper}>
-
       <Navbar onMenuClick={() => setSidebarOpen(true)} />
-<Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-
+      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       <div style={styles.container}>
         <div style={styles.card}>
           <h2 style={styles.title}>Admin</h2>
           <form onSubmit={handleLogin} style={styles.form}>
             <input
-              type="text"
-              placeholder="Username"
+              type="email"
+              placeholder="Email"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               style={styles.input}
@@ -97,16 +82,12 @@ const styles = {
     minHeight: "100vh",
   },
 
-
-
   container: {
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
     paddingTop: "80px",
   },
-
-
 
   card: {
     width: "380px",
@@ -121,16 +102,12 @@ const styles = {
     overflow: "hidden",
   },
 
-
-
   title: {
     color: "#ffffff",
     fontSize: "32px",
     fontWeight: "600",
     marginBottom: "30px",
   },
-
-
 
   form: {
     width: "80%",
@@ -148,8 +125,6 @@ const styles = {
     boxSizing: "border-box",
   },
 
-
-
   button: {
     width: "100%",
     padding: "15px",
@@ -160,10 +135,7 @@ const styles = {
     fontSize: "18px",
     fontWeight: "bold",
     cursor: "pointer",
-
   },
-
-
 
   error: {
     color: "#ffda79",
@@ -182,8 +154,6 @@ const styles = {
     alignItems: "center",
     marginTop: "auto",
   },
-
-
 
   footerText: {
     color: "#6b4f3a",

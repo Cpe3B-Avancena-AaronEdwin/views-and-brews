@@ -1,6 +1,6 @@
-// client/src/App.jsx
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { onAuthStateChanged } from "firebase/auth";
 
 import Home from "./Home";
 import Menu from "./Menu";
@@ -8,8 +8,38 @@ import About from "./About";
 import Login from "./Login";
 import Admin from "./Admin";
 
+import { auth } from "./firebase";
+import { getUserRole } from "./auth";
+
 export default function App() {
+  const [loading, setLoading] = useState(true);
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        setIsAdminLoggedIn(false);
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const role = await getUserRole(user.uid);
+        setIsAdminLoggedIn(role === "admin");
+      } catch (error) {
+        console.error("Role check failed:", error);
+        setIsAdminLoggedIn(false);
+      } finally {
+        setLoading(false);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  if (loading) {
+    return <div style={{ padding: "40px" }}>Checking admin access...</div>;
+  }
 
   return (
     <Router>
@@ -18,11 +48,9 @@ export default function App() {
         <Route path="/menu" element={<Menu />} />
         <Route path="/about" element={<About />} />
         <Route path="/login" element={<Login setIsAdminLoggedIn={setIsAdminLoggedIn} />} />
-
-        {/* Protected route for admin */}
-        <Route 
-          path="/admin" 
-          element={isAdminLoggedIn ? <Admin /> : <Navigate to="/login" replace />} 
+        <Route
+          path="/admin"
+          element={isAdminLoggedIn ? <Admin /> : <Navigate to="/login" replace />}
         />
       </Routes>
     </Router>
