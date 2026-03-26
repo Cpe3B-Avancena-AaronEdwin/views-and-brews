@@ -90,8 +90,7 @@ export default function Sidebar({ isOpen, onClose }) {
           display: "flex",
           flexDirection: "column",
           gap: "18px",
-          overflowY: "auto",
-          boxSizing: "border-box"
+          overflowY: "auto"
         }}
       >
         <button
@@ -264,15 +263,12 @@ const outlineBtn = {
 };
 
 const logoutBtn = {
+  marginTop: "auto",
   border: "none",
   background: "#c62828",
   color: "white",
   padding: "14px 16px",
   borderRadius: "14px",
   fontWeight: "800",
-  cursor: "pointer",
-  width: "100%",
-  marginTop: "8px",
-  marginBottom: "8px",
-  flexShrink: 0
+  cursor: "pointer"
 };

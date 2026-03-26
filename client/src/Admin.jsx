@@ -9,6 +9,7 @@ import {
   collection,
   deleteDoc,
   doc,
+  increment,
   onSnapshot,
   orderBy,
   query,
@@ -589,6 +590,15 @@ export default function Admin() {
         if (!orderSnap.exists()) throw new Error("Order not found.");
 
         const order = orderSnap.data();
+
+        let userRef = null;
+        let userSnap = null;
+
+        if (order.userId) {
+          userRef = doc(db, "users", order.userId);
+          userSnap = await transaction.get(userRef);
+        }
+
         if (order.status !== "pending") throw new Error("Order is no longer pending.");
 
         const items = order.items || [];
@@ -664,6 +674,14 @@ export default function Admin() {
           }
         }
 
+        const finalItems = [...enrichedItems, ...voidItems];
+        const finalTotal = enrichedItems.reduce(
+          (sum, item) => sum + Number(item.subtotal || 0),
+          0
+        );
+
+        const pointsEarned = Math.floor(Number(finalTotal || 0) / 10);
+
         for (const ingredientId of Object.keys(ingredientUsageMap)) {
           const ingredientRef = ingredientDocs[ingredientId].ref;
           const ingredientData = ingredientDocs[ingredientId].data;
@@ -675,11 +693,11 @@ export default function Admin() {
           });
         }
 
-        const finalItems = [...enrichedItems, ...voidItems];
-        const finalTotal = enrichedItems.reduce(
-          (sum, item) => sum + Number(item.subtotal || 0),
-          0
-        );
+        if (userSnap && userSnap.exists() && pointsEarned > 0) {
+          transaction.update(userRef, {
+            points: increment(pointsEarned)
+          });
+        }
 
         transaction.update(orderRef, {
           status: "completed",
