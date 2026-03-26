@@ -22,45 +22,52 @@ The Brews & Views Mobile Cart Cafe Ordering System is a web-based application de
 - CSS3
 - JavaScript
 
-### Backend
-- Node.js
-- Express.js
-- Protected Routes & Password Hashing
-
-### Database
-- MySQL (via XAMPP / phpMyAdmin)
+### Backend & Infrastructure
+- Firebase Auth
+- Cloud Firestore
+- Firebase Storage
+- Node.js & Express.js
 
 ### Development Tools
 - Visual Studio Code
 - Git & GitHub
+- Firebase Console
 
 ---
 
 ## Brews and Views Setup Guide
 
-## 1. Database Configuration
-1. Open XAMPP Control Panel and start Apache and MySQL.
-2. Navigate to http://localhost/phpmyadmin.
-3. Create a new database named views_and_brews.
-4. Select the database and click the Import tab.
-5. Upload the SQL file located at: client/database/views_and_brews.sql.
+## 1. Firebase Project Setup
+1. Go to the Firebase Console.
+2. Create a new project named views-and-brews.
+3. Enable Authentication (Email/Password provider).
+4. Create a Cloud Firestore database in "Test Mode" or "Locked Mode" with appropriate rules.
+5. Enable Storage to allow product image uploads.
 
-## 2. Install Dependencies
-### Install backend dependencies
-cd server
-npm install
+## 2. Configure Firebase in React
+1. In your Firebase Console, add a "Web App" to get your configuration object.
+2. Create a file in client/src/firebaseConfig.js and paste your credentials
+```text
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "your-app.firebaseapp.com",
+  projectId: "your-app",
+  storageBucket: "your-app.appspot.com",
+  messagingSenderId: "...",
+  appId: "..."
+};
+```
 
-### Install frontend dependencies
-cd ../client
-npm install
+### 3. Install Dependencies
+### Open your terminal and run:
+cd client && npm install firebase
 
-## 3. Environment Setup
-### Create a .env file in the server directory and update your MySQL credentials:
-DB_HOST="localhost"
-DB_USER="root"
-DB_PASSWORD="yourpassword"
-DB_NAME="views_and_brews"
-PORT=5000
+## 4. Import Data 
+### In the Firebase Console, you can manually initialize your collections within Cloud Firestore to match the system requirements:
+- categories (e.g., Espresso Based, Non-Coffee)
+- products (Name, Price, ImageURL, Category)
+- orders (Customer details, Items, Status, Timestamp)
+- ingredients (Inventory tracking for raw materials)
 
 ## 4. Run Application
 ### Backend
