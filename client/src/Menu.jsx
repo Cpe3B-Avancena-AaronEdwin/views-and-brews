@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
+import { addDoc, collection, onSnapshot, serverTimestamp } from "firebase/firestore";
 import Navbar from "./Navbar";
 import Sidebar from "./Sidebar";
-
-const API = "http://localhost:5000";
+import { db } from "./firebase";
 
 export default function Menu() {
   const [products, setProducts] = useState([]);
@@ -23,10 +23,15 @@ export default function Menu() {
   ];
 
   useEffect(() => {
-    fetch(`${API}/api/products`)
-      .then((res) => res.json())
-      .then(setProducts)
-      .catch((err) => console.error("Fetch products error:", err));
+    const unsubscribe = onSnapshot(collection(db, "products"), (snapshot) => {
+      const items = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setProducts(items);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const filteredProducts =
@@ -37,6 +42,7 @@ export default function Menu() {
   const addToCart = (product) => {
     setCart((prev) => {
       const existing = prev.find((item) => item.id === product.id);
+
       if (existing) {
         return prev.map((item) =>
           item.id === product.id
@@ -44,6 +50,7 @@ export default function Menu() {
             : item
         );
       }
+
       return [...prev, { ...product, quantity: 1 }];
     });
   };
@@ -79,32 +86,28 @@ export default function Menu() {
 
   const placeOrder = async () => {
     if (cart.length === 0) {
-      return alert("Cart is empty.");
+      alert("Cart is empty.");
+      return;
     }
 
     try {
       setPlacingOrder(true);
 
-      const res = await fetch(`${API}/api/orders`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          items: cart.map((item) => ({
-            product_id: item.id,
-            quantity: item.quantity
-          }))
-        })
+      await addDoc(collection(db, "orders"), {
+        items: cart.map((item) => ({
+          productId: item.id,
+          name: item.name,
+          category: item.category || "",
+          price: Number(item.price),
+          quantity: Number(item.quantity),
+          subtotal: Number(item.price) * Number(item.quantity)
+        })),
+        total: Number(cartTotal),
+        status: "pending",
+        createdAt: serverTimestamp()
       });
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        return alert(data.message || "Failed to place order");
-      }
-
-      alert(`Order queued successfully. Order #${data.order_id}`);
+      alert("Order placed!");
       setCart([]);
     } catch (err) {
       console.error("Place order error:", err);
@@ -116,6 +119,9 @@ export default function Menu() {
 
   return (
     <div className="page-wrapper">
+      <Navbar onMenuClick={() => setSidebarOpen(true)} />
+      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+
       <div className="content-spacing">
         <div className="main-content-card">
           <header className="menu-header">
@@ -142,8 +148,11 @@ export default function Menu() {
                 <div key={p.id} className="product-card">
                   <div className="image-container">
                     <img
-                      src={p.image ? API + p.image : "/placeholder.png"}
+                      src={p.imageUrl || "/placeholder.png"}
                       alt={p.name}
+                      onError={(e) => {
+                        e.currentTarget.src = "/placeholder.png";
+                      }}
                     />
                   </div>
                   <div className="product-info">
@@ -191,9 +200,7 @@ export default function Menu() {
                         <div className="cart-item-right">
                           <strong>
                             ₱
-                            {(
-                              Number(item.price) * Number(item.quantity)
-                            ).toFixed(2)}
+                            {(Number(item.price) * Number(item.quantity)).toFixed(2)}
                           </strong>
                           <button
                             className="remove-btn"
