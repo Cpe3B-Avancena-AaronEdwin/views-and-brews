@@ -826,6 +826,9 @@ export default function Admin() {
                                     })
                                   : "No date"}
                               </p>
+                              <p>
+                                Customer: {order.customerName || order.customerEmail || "Unknown customer"}
+                              </p>
                             </div>
                             <strong>₱{Number(order.total || 0).toFixed(2)}</strong>
                           </div>

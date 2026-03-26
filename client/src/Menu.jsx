@@ -1,13 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { addDoc, collection, onSnapshot, serverTimestamp } from "firebase/firestore";
-import Navbar from "./Navbar";
-import Sidebar from "./Sidebar";
+import { addDoc, collection, doc, getDoc, onSnapshot, serverTimestamp } from "firebase/firestore";
+import { auth } from "./firebase";
 import { db } from "./firebase";
 
 export default function Menu() {
   const [products, setProducts] = useState([]);
   const [activeCategory, setActiveCategory] = useState("All");
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [cart, setCart] = useState([]);
   const [placingOrder, setPlacingOrder] = useState(false);
 
@@ -85,6 +83,15 @@ export default function Menu() {
   }, [cart]);
 
   const placeOrder = async () => {
+    const user = auth.currentUser;
+
+    // 🔒 REQUIRE LOGIN
+    if (!user) {
+      alert("Please login first before placing an order.");
+      window.location.href = "/login";
+      return;
+    }
+
     if (cart.length === 0) {
       alert("Cart is empty.");
       return;
@@ -93,7 +100,21 @@ export default function Menu() {
     try {
       setPlacingOrder(true);
 
+      const userRef = doc(db, "users", user.uid);
+      const userSnap = await getDoc(userRef);
+      const userData = userSnap.exists() ? userSnap.data() : {};
+
+      const customerName =
+        userData.displayName ||
+        user.displayName ||
+        user.email?.split("@")[0] ||
+        "Customer";
+
       await addDoc(collection(db, "orders"), {
+        userId: user.uid,
+        customerEmail: user.email,
+        customerName: customerName,
+
         items: cart.map((item) => ({
           productId: item.id,
           name: item.name,
@@ -102,12 +123,13 @@ export default function Menu() {
           quantity: Number(item.quantity),
           subtotal: Number(item.price) * Number(item.quantity)
         })),
+
         total: Number(cartTotal),
         status: "pending",
         createdAt: serverTimestamp()
       });
 
-      alert("Order placed!");
+      alert("Order placed successfully!");
       setCart([]);
     } catch (err) {
       console.error("Place order error:", err);
@@ -119,9 +141,6 @@ export default function Menu() {
 
   return (
     <div className="page-wrapper">
-      <Navbar onMenuClick={() => setSidebarOpen(true)} />
-      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-
       <div className="content-spacing">
         <div className="main-content-card">
           <header className="menu-header">
@@ -155,12 +174,14 @@ export default function Menu() {
                       }}
                     />
                   </div>
+
                   <div className="product-info">
                     <h3>{p.name}</h3>
                     <p className="price">₱{Number(p.price).toLocaleString()}</p>
                     <p className="description">
                       {p.description || "A delicious blend of premium ingredients."}
                     </p>
+
                     <button className="order-btn" onClick={() => addToCart(p)}>
                       Add to Order
                     </button>
@@ -202,6 +223,7 @@ export default function Menu() {
                             ₱
                             {(Number(item.price) * Number(item.quantity)).toFixed(2)}
                           </strong>
+
                           <button
                             className="remove-btn"
                             onClick={() => removeFromCart(item.id)}
