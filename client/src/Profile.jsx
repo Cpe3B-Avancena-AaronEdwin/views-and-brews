@@ -68,7 +68,7 @@ export default function Sidebar({ isOpen, onClose }) {
             position: "fixed",
             inset: 0,
             background: "rgba(0,0,0,0.4)",
-            zIndex: 1999
+            zIndex: 999
           }}
         />
       )}
@@ -84,38 +84,28 @@ export default function Sidebar({ isOpen, onClose }) {
           height: "100vh",
           background: "#fffaf6",
           boxShadow: "8px 0 30px rgba(0,0,0,0.12)",
-          zIndex: 2000,
+          zIndex: 1000,
           transition: "transform 0.3s ease",
-          padding: "70px 24px 24px 24px",
+          padding: "24px",
           display: "flex",
           flexDirection: "column",
           gap: "18px",
-          overflowY: "auto",
-          boxSizing: "border-box"
+          overflowY: "auto"
         }}
       >
-<button
-  onClick={onClose}
-  style={{
-    position: "absolute",
-    top: "18px",
-    right: "18px",
-    border: "none",
-    background: "#6b4f3a",
-    color: "#fff",
-    width: "40px",
-    height: "40px",
-    borderRadius: "50%",
-    fontSize: "1.4rem",
-    cursor: "pointer",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 2001
-  }}
->
-  ×
-</button>
+        <button
+          onClick={onClose}
+          style={{
+            alignSelf: "flex-end",
+            border: "none",
+            background: "transparent",
+            fontSize: "1.5rem",
+            cursor: "pointer",
+            color: "#4a3728"
+          }}
+        >
+          ×
+        </button>
 
         {userData ? (
           <div
@@ -206,6 +196,9 @@ export default function Sidebar({ isOpen, onClose }) {
             About
           </Link>
 
+          <Link to="/menu" onClick={onClose} style={navLink(isActive("/menu"))}>
+            Menu
+          </Link>
 
           {userData && (
             <>
@@ -270,15 +263,12 @@ const outlineBtn = {
 };
 
 const logoutBtn = {
+  marginTop: "auto",
   border: "none",
   background: "#c62828",
   color: "white",
   padding: "14px 16px",
   borderRadius: "14px",
   fontWeight: "800",
-  cursor: "pointer",
-  width: "100%",
-  marginTop: "8px",
-  marginBottom: "8px",
-  flexShrink: 0
+  cursor: "pointer"
 };

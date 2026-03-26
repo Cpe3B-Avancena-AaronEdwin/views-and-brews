@@ -6,7 +6,10 @@ import Home from "./Home";
 import Menu from "./Menu";
 import About from "./About";
 import Login from "./Login";
+import Register from "./Register";
 import Admin from "./Admin";
+import Profile from "./Profile";
+import OrderHistory from "./OrderHistory";
 
 import { auth } from "./firebase";
 import { getUserRole } from "./auth";
@@ -38,7 +41,7 @@ export default function App() {
   }, []);
 
   if (loading) {
-    return <div style={{ padding: "40px" }}>Checking admin access...</div>;
+    return <div style={{ padding: "40px" }}>Checking access.</div>;
   }
 
   return (
@@ -48,6 +51,9 @@ export default function App() {
         <Route path="/menu" element={<Menu />} />
         <Route path="/about" element={<About />} />
         <Route path="/login" element={<Login setIsAdminLoggedIn={setIsAdminLoggedIn} />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/profile" element={<Profile />} />
+        <Route path="/order-history" element={<OrderHistory />} />
         <Route
           path="/admin"
           element={isAdminLoggedIn ? <Admin /> : <Navigate to="/login" replace />}

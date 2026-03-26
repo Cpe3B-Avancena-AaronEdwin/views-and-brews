@@ -1,16 +1,35 @@
 import { auth, db } from "./firebase";
 import {
-  signInWithEmailAndPassword,
-  signOut,
+  browserSessionPersistence,
+  createUserWithEmailAndPassword,
   setPersistence,
-  browserSessionPersistence
+  signInWithEmailAndPassword,
+  signOut
 } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 
 export async function loginUser(email, password) {
   await setPersistence(auth, browserSessionPersistence);
   const cred = await signInWithEmailAndPassword(auth, email, password);
   return cred.user;
+}
+
+export async function registerCustomer(email, password, displayName) {
+  await setPersistence(auth, browserSessionPersistence);
+
+  const cred = await createUserWithEmailAndPassword(auth, email, password);
+  const user = cred.user;
+
+  await setDoc(doc(db, "users", user.uid), {
+    email: user.email,
+    displayName,
+    role: "customer",
+    points: 0,
+    favoriteProductIds: [],
+    createdAt: serverTimestamp()
+  });
+
+  return user;
 }
 
 export async function logoutUser() {

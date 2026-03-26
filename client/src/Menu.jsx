@@ -1,18 +1,28 @@
 import { useEffect, useMemo, useState } from "react";
-import { addDoc, collection, onSnapshot, serverTimestamp } from "firebase/firestore";
-import Navbar from "./Navbar";
-import Sidebar from "./Sidebar";
-import { db } from "./firebase";
+import {
+  addDoc,
+  arrayRemove,
+  arrayUnion,
+  collection,
+  doc,
+  getDoc,
+  onSnapshot,
+  serverTimestamp,
+  updateDoc
+} from "firebase/firestore";
+import { auth, db } from "./firebase";
 
 export default function Menu() {
   const [products, setProducts] = useState([]);
   const [activeCategory, setActiveCategory] = useState("All");
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [cart, setCart] = useState([]);
   const [placingOrder, setPlacingOrder] = useState(false);
+  const [favoriteProductIds, setFavoriteProductIds] = useState([]);
+  const [favoriteLoadingId, setFavoriteLoadingId] = useState("");
 
   const categories = [
     "All",
+    "Favorites",
     "Coffee Based",
     "Non-Coffee Based",
     "Matcha Series",
@@ -23,20 +33,40 @@ export default function Menu() {
   ];
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "products"), (snapshot) => {
-      const items = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data()
+    const unsubscribeProducts = onSnapshot(collection(db, "products"), (snapshot) => {
+      const items = snapshot.docs.map((docItem) => ({
+        id: docItem.id,
+        ...docItem.data()
       }));
       setProducts(items);
     });
 
-    return () => unsubscribe();
+    let unsubscribeUser = null;
+
+    const unsubscribeAuth = auth.onAuthStateChanged((user) => {
+      if (!user) {
+        setFavoriteProductIds([]);
+        return;
+      }
+
+      unsubscribeUser = onSnapshot(doc(db, "users", user.uid), (userSnap) => {
+        const userData = userSnap.exists() ? userSnap.data() : {};
+        setFavoriteProductIds(userData.favoriteProductIds || []);
+      });
+    });
+
+    return () => {
+      unsubscribeProducts();
+      unsubscribeAuth();
+      if (unsubscribeUser) unsubscribeUser();
+    };
   }, []);
 
   const filteredProducts =
     activeCategory === "All"
       ? products
+      : activeCategory === "Favorites"
+      ? products.filter((p) => favoriteProductIds.includes(p.id))
       : products.filter((p) => p.category === activeCategory);
 
   const addToCart = (product) => {
@@ -84,7 +114,41 @@ export default function Menu() {
     );
   }, [cart]);
 
+  const toggleFavorite = async (productId) => {
+    const user = auth.currentUser;
+
+    if (!user) {
+      alert("Please login first to save favorites.");
+      return;
+    }
+
+    try {
+      setFavoriteLoadingId(productId);
+      const userRef = doc(db, "users", user.uid);
+      const isFavorite = favoriteProductIds.includes(productId);
+
+      await updateDoc(userRef, {
+        favoriteProductIds: isFavorite
+          ? arrayRemove(productId)
+          : arrayUnion(productId)
+      });
+    } catch (err) {
+      console.error("Favorite toggle error:", err);
+      alert("Failed to update favorites.");
+    } finally {
+      setFavoriteLoadingId("");
+    }
+  };
+
   const placeOrder = async () => {
+    const user = auth.currentUser;
+
+    if (!user) {
+      alert("Please login first before placing an order.");
+      window.location.href = "/login";
+      return;
+    }
+
     if (cart.length === 0) {
       alert("Cart is empty.");
       return;
@@ -93,7 +157,21 @@ export default function Menu() {
     try {
       setPlacingOrder(true);
 
+      const userRef = doc(db, "users", user.uid);
+      const userSnap = await getDoc(userRef);
+      const userData = userSnap.exists() ? userSnap.data() : {};
+
+      const customerName =
+        userData.displayName ||
+        user.displayName ||
+        user.email?.split("@")[0] ||
+        "Customer";
+
       await addDoc(collection(db, "orders"), {
+        userId: user.uid,
+        customerEmail: user.email || "",
+        customerName,
+
         items: cart.map((item) => ({
           productId: item.id,
           name: item.name,
@@ -102,12 +180,13 @@ export default function Menu() {
           quantity: Number(item.quantity),
           subtotal: Number(item.price) * Number(item.quantity)
         })),
+
         total: Number(cartTotal),
         status: "pending",
         createdAt: serverTimestamp()
       });
 
-      alert("Order placed!");
+      alert("Order placed successfully!");
       setCart([]);
     } catch (err) {
       console.error("Place order error:", err);
@@ -119,9 +198,6 @@ export default function Menu() {
 
   return (
     <div className="page-wrapper">
-      <Navbar onMenuClick={() => setSidebarOpen(true)} />
-      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-
       <div className="content-spacing">
         <div className="main-content-card">
           <header className="menu-header">
@@ -144,29 +220,44 @@ export default function Menu() {
 
           <div className="menu-layout">
             <main className="product-grid">
-              {filteredProducts.map((p) => (
-                <div key={p.id} className="product-card">
-                  <div className="image-container">
-                    <img
-                      src={p.imageUrl || "/placeholder.png"}
-                      alt={p.name}
-                      onError={(e) => {
-                        e.currentTarget.src = "/placeholder.png";
-                      }}
-                    />
+              {filteredProducts.map((p) => {
+                const isFavorite = favoriteProductIds.includes(p.id);
+
+                return (
+                  <div key={p.id} className="product-card">
+                    <div className="image-container">
+                      <img
+                        src={p.imageUrl || "/placeholder.png"}
+                        alt={p.name}
+                        onError={(e) => {
+                          e.currentTarget.src = "/placeholder.png";
+                        }}
+                      />
+
+                      <button
+                        className={`favorite-btn ${isFavorite ? "active" : ""}`}
+                        onClick={() => toggleFavorite(p.id)}
+                        disabled={favoriteLoadingId === p.id}
+                        title={isFavorite ? "Remove from favorites" : "Add to favorites"}
+                      >
+                        {isFavorite ? "♥" : "♡"}
+                      </button>
+                    </div>
+
+                    <div className="product-info">
+                      <h3>{p.name}</h3>
+                      <p className="price">₱{Number(p.price).toLocaleString()}</p>
+                      <p className="description">
+                        {p.description || "A delicious blend of premium ingredients."}
+                      </p>
+
+                      <button className="order-btn" onClick={() => addToCart(p)}>
+                        Add to Order
+                      </button>
+                    </div>
                   </div>
-                  <div className="product-info">
-                    <h3>{p.name}</h3>
-                    <p className="price">₱{Number(p.price).toLocaleString()}</p>
-                    <p className="description">
-                      {p.description || "A delicious blend of premium ingredients."}
-                    </p>
-                    <button className="order-btn" onClick={() => addToCart(p)}>
-                      Add to Order
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
 
               {filteredProducts.length === 0 && (
                 <p className="no-products">No items found in this category.</p>
@@ -202,6 +293,7 @@ export default function Menu() {
                             ₱
                             {(Number(item.price) * Number(item.quantity)).toFixed(2)}
                           </strong>
+
                           <button
                             className="remove-btn"
                             onClick={() => removeFromCart(item.id)}
@@ -351,12 +443,31 @@ export default function Menu() {
           width: 100%;
           height: 200px;
           background: #fafafa;
+          position: relative;
         }
 
         .image-container img {
           width: 100%;
           height: 100%;
           object-fit: cover;
+        }
+
+        .favorite-btn {
+          position: absolute;
+          top: 12px;
+          right: 12px;
+          width: 42px;
+          height: 42px;
+          border: none;
+          border-radius: 50%;
+          background: rgba(255,255,255,0.95);
+          font-size: 1.2rem;
+          cursor: pointer;
+          box-shadow: 0 6px 16px rgba(0,0,0,0.12);
+        }
+
+        .favorite-btn.active {
+          color: #c62828;
         }
 
         .product-info {
