@@ -1,0 +1,15 @@
+# env files
+.env
+.env.*
+client/.env
+server/.env
+
+# node
+node_modules
+
+# build
+dist
+build
+
+# misc
+.DS_Store

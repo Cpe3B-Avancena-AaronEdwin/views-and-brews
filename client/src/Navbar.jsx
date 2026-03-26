@@ -1,40 +1,37 @@
-import { Link } from "react-router-dom";
-
 function Navbar({ onMenuClick }) {
   return (
     <nav
       style={{
-        textAlign: "center",
         padding: "20px",
         backgroundColor: "#6b4f3a",
         color: "white",
         display: "flex",
         alignItems: "center",
-        justifyContent: "space-between"
+        justifyContent: "space-between",
+
+        position: "sticky",
+        top: 0,
+        zIndex: 10
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: "15px" }}>
-        <button
-          onClick={onMenuClick}
-          style={{
-            background: "transparent",
-            border: "none",
-            color: "white",
-            fontSize: "24px",
-            cursor: "pointer"
-          }}
-        >
-          ☰
-        </button>
+      <button
+        onClick={onMenuClick}
+        style={{
+          background: "transparent",
+          border: "none",
+          color: "white",
+          fontSize: "24px",
+          cursor: "pointer"
+        }}
+      >
+        ☰
+      </button>
 
-        <span style={{ fontWeight: "bold", fontSize: "20px" }}>
-          Brews & Views
-        </span>
-      </div>
+      <span style={{ fontWeight: "bold", fontSize: "20px" }}>
+        Brews & Views
+      </span>
 
-      <div>
-
-      </div>
+      <div style={{ width: "24px" }} /> {/* spacing balance */}
     </nav>
   );
 }
