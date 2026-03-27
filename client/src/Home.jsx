@@ -73,7 +73,7 @@ export default function Home() {
 
       <section className="hero-section">
         <div className="nav-overlay">
-          <Navbar onMenuClick={() => setSidebarOpen(true)} />
+          <Navbar />
         </div>
 
         <link

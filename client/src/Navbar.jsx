@@ -8,7 +8,6 @@ function Navbar({ onMenuClick }) {
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-
         position: "sticky",
         top: 0,
         zIndex: 10
@@ -31,7 +30,7 @@ function Navbar({ onMenuClick }) {
         Brews & Views
       </span>
 
-      <div style={{ width: "24px" }} /> {/* spacing balance */}
+      <div style={{ width: "24px" }} />
     </nav>
   );
 }

@@ -13,8 +13,9 @@ import {
 import { auth, db } from "./firebase";
 import { useNavigate } from "react-router-dom";
 
-const navigate = useNavigate();
 export default function Menu() {
+  const navigate = useNavigate();
+  
   const [products, setProducts] = useState([]);
   const [activeCategory, setActiveCategory] = useState("All");
   const [cart, setCart] = useState([]);
