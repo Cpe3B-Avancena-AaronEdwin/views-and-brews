@@ -8,8 +8,7 @@ function Navbar({ onMenuClick }) {
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        position: "sticky",
-        top: 0,
+        position: "relative",
         zIndex: 10
       }}
     >
