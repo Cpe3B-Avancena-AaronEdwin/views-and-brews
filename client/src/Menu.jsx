@@ -11,8 +11,11 @@ import {
   updateDoc
 } from "firebase/firestore";
 import { auth, db } from "./firebase";
+import { useNavigate } from "react-router-dom";
 
 export default function Menu() {
+  const navigate = useNavigate();
+  
   const [products, setProducts] = useState([]);
   const [activeCategory, setActiveCategory] = useState("All");
   const [cart, setCart] = useState([]);
@@ -145,10 +148,9 @@ export default function Menu() {
 
     if (!user) {
       alert("Please login first before placing an order.");
-      window.location.href = "/login";
-      return;
-    }
-
+      navigate("/login");
+       return;
+      }     
     if (cart.length === 0) {
       alert("Cart is empty.");
       return;
