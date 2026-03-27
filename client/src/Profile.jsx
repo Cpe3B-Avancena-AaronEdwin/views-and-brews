@@ -1,274 +1,156 @@
 import { useEffect, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import { onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "./firebase";
-import { logoutUser } from "./auth";
+import { doc, getDoc } from "firebase/firestore";
+import { onAuthStateChanged } from "firebase/auth";
+import { useNavigate } from "react-router-dom";
 
-export default function Sidebar({ isOpen, onClose }) {
+import Navbar from "./Navbar";
+import Sidebar from "./Sidebar";
+
+export default function Profile() {
   const navigate = useNavigate();
-  const location = useLocation();
 
   const [userData, setUserData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
         setUserData(null);
+        setLoading(false);
         return;
       }
 
       try {
         const userRef = doc(db, "users", user.uid);
-        const userSnap = await getDoc(userRef);
+        const snap = await getDoc(userRef);
 
-        if (userSnap.exists()) {
+        if (snap.exists()) {
           setUserData({
             uid: user.uid,
-            email: user.email || "",
-            ...userSnap.data()
+            email: user.email,
+            ...snap.data()
           });
         } else {
           setUserData({
             uid: user.uid,
-            email: user.email || "",
-            displayName: user.displayName || "Customer",
+            email: user.email,
+            displayName: "Customer",
             points: 0,
-            role: "customer",
             favoriteProductIds: []
           });
         }
       } catch (err) {
-        console.error("Sidebar user load failed:", err);
+        console.error("Profile load error:", err);
+      } finally {
+        setLoading(false);
       }
     });
 
     return () => unsubscribe();
   }, []);
 
-  const handleLogout = async () => {
-    try {
-      await logoutUser();
-      onClose?.();
-      navigate("/login");
-    } catch (err) {
-      console.error("Logout failed:", err);
-      alert("Failed to logout.");
-    }
-  };
+  // 🔄 Loading
+  if (loading) {
+    return (
+      <div>
+        <Navbar onMenuClick={() => setSidebarOpen(true)} />
+        <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+        <div style={{ padding: "40px" }}>Loading profile...</div>
+      </div>
+    );
+  }
 
-  const isActive = (path) => location.pathname === path;
+  // ❌ Not logged in
+  if (!userData) {
+    return (
+      <div>
+        <Navbar onMenuClick={() => setSidebarOpen(true)} />
+        <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+
+        <div style={{ padding: "40px" }}>
+          <h2>Please login first.</h2>
+          <button onClick={() => navigate("/login")}>Go to Login</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <>
-      {isOpen && (
-        <div
-          onClick={onClose}
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.4)",
-            zIndex: 999
-          }}
-        />
-      )}
+    <div style={{ minHeight: "100vh", background: "#fff7f0" }}>
+      <Navbar onMenuClick={() => setSidebarOpen(true)} />
+      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-      <aside
+      <div
         style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          transform: isOpen ? "translateX(0)" : "translateX(-100%)",
-          width: "320px",
-          maxWidth: "85vw",
-          height: "100vh",
-          background: "#fffaf6",
-          boxShadow: "8px 0 30px rgba(0,0,0,0.12)",
-          zIndex: 1000,
-          transition: "transform 0.3s ease",
-          padding: "24px",
-          display: "flex",
-          flexDirection: "column",
-          gap: "18px",
-          overflowY: "auto"
+          padding: "40px",
+          maxWidth: "600px",
+          margin: "0 auto",
+          fontFamily: "Inter, sans-serif",
+          color: "#4a3728"
         }}
       >
-        <button
-          onClick={onClose}
+        <h1 style={{ marginBottom: "25px" }}>My Profile</h1>
+
+        <div
           style={{
-            alignSelf: "flex-end",
-            border: "none",
-            background: "transparent",
-            fontSize: "1.5rem",
-            cursor: "pointer",
-            color: "#4a3728"
+            background: "#f7efe8",
+            padding: "25px",
+            borderRadius: "18px",
+            border: "1px solid #d9c7b8",
+            boxShadow: "0 10px 20px rgba(0,0,0,0.05)"
           }}
         >
-          ×
-        </button>
-
-        {userData ? (
           <div
-            onClick={() => {
-              onClose?.();
-              navigate("/profile");
-            }}
             style={{
-              background: "#f7efe8",
-              border: "1px solid #d9c7b8",
-              borderRadius: "22px",
-              padding: "22px",
+              width: "80px",
+              height: "80px",
+              borderRadius: "50%",
+              background: "#6b4f3a",
+              color: "#fff",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "2rem",
+              fontWeight: "800",
+              marginBottom: "20px"
+            }}
+          >
+            {(userData.displayName || userData.email || "U")
+              .charAt(0)
+              .toUpperCase()}
+          </div>
+
+          <p><strong>Name:</strong> {userData.displayName || "Customer"}</p>
+          <p><strong>Email:</strong> {userData.email}</p>
+          <p><strong>Points:</strong> {userData.points || 0}</p>
+
+          <p>
+            <strong>Favorites:</strong>{" "}
+            {Array.isArray(userData.favoriteProductIds)
+              ? userData.favoriteProductIds.length
+              : 0}
+          </p>
+        </div>
+
+        <div style={{ marginTop: "25px" }}>
+          <button
+            onClick={() => navigate("/order-history")}
+            style={{
+              background: "#6b4f3a",
+              color: "white",
+              padding: "12px 20px",
+              border: "none",
+              borderRadius: "10px",
+              fontWeight: "700",
               cursor: "pointer"
             }}
           >
-            <div
-              style={{
-                width: "74px",
-                height: "74px",
-                borderRadius: "50%",
-                background: "#7a5a43",
-                color: "#fff",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontWeight: "800",
-                fontSize: "2rem",
-                marginBottom: "14px"
-              }}
-            >
-              {(userData.displayName || userData.email || "U").charAt(0).toUpperCase()}
-            </div>
-
-            <h3 style={{ margin: "0 0 6px 0", color: "#4a3728", fontSize: "1.9rem" }}>
-              {userData.displayName || "Customer"}
-            </h3>
-
-            <p
-              style={{
-                margin: "0 0 8px 0",
-                color: "#7a6a5c",
-                fontSize: "1rem",
-                wordBreak: "break-word"
-              }}
-            >
-              {userData.email}
-            </p>
-
-            <p style={{ margin: "0 0 6px 0", color: "#7a6a5c", fontSize: "1rem" }}>
-              Points: {Number(userData.points || 0)}
-            </p>
-
-            <p style={{ margin: 0, color: "#7a6a5c", fontSize: "0.95rem" }}>
-              Favorites: {Array.isArray(userData.favoriteProductIds) ? userData.favoriteProductIds.length : 0}
-            </p>
-          </div>
-        ) : (
-          <div
-            style={{
-              background: "#f7efe8",
-              border: "1px solid #d9c7b8",
-              borderRadius: "22px",
-              padding: "22px"
-            }}
-          >
-            <h3 style={{ marginTop: 0, color: "#4a3728" }}>Welcome</h3>
-            <p style={{ color: "#7a6a5c", marginBottom: "14px" }}>
-              Login to place orders, save favorites, and view your profile.
-            </p>
-
-            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-              <Link to="/login" onClick={onClose} style={primaryBtn}>
-                Login
-              </Link>
-              <Link to="/register" onClick={onClose} style={outlineBtn}>
-                Register
-              </Link>
-            </div>
-          </div>
-        )}
-
-        <nav style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-          <Link to="/" onClick={onClose} style={navLink(isActive("/"))}>
-            Home
-          </Link>
-
-          <Link to="/about" onClick={onClose} style={navLink(isActive("/about"))}>
-            About
-          </Link>
-
-          <Link to="/menu" onClick={onClose} style={navLink(isActive("/menu"))}>
-            Menu
-          </Link>
-
-          {userData && (
-            <>
-              <Link to="/profile" onClick={onClose} style={navLink(isActive("/profile"))}>
-                My Profile
-              </Link>
-
-              <Link
-                to="/order-history"
-                onClick={onClose}
-                style={navLink(isActive("/order-history"))}
-              >
-                Order History
-              </Link>
-            </>
-          )}
-
-          {userData?.role === "admin" && (
-            <Link to="/admin" onClick={onClose} style={navLink(isActive("/admin"))}>
-              Admin Dashboard
-            </Link>
-          )}
-        </nav>
-
-        {userData && (
-          <button onClick={handleLogout} style={logoutBtn}>
-            Logout
+            View Order History
           </button>
-        )}
-      </aside>
-    </>
+        </div>
+      </div>
+    </div>
   );
 }
-
-const navLink = (active) => ({
-  textDecoration: "none",
-  color: active ? "#fff" : "#4a3728",
-  fontWeight: "800",
-  padding: "16px 18px",
-  borderRadius: "16px",
-  background: active ? "#6b4f3a" : "#f7f2ee",
-  boxShadow: active ? "0 8px 18px rgba(107,79,58,0.18)" : "none"
-});
-
-const primaryBtn = {
-  textDecoration: "none",
-  background: "#6b4f3a",
-  color: "white",
-  padding: "10px 16px",
-  borderRadius: "10px",
-  fontWeight: "700"
-};
-
-const outlineBtn = {
-  textDecoration: "none",
-  background: "transparent",
-  color: "#6b4f3a",
-  border: "1px solid #6b4f3a",
-  padding: "10px 16px",
-  borderRadius: "10px",
-  fontWeight: "700"
-};
-
-const logoutBtn = {
-  marginTop: "auto",
-  border: "none",
-  background: "#c62828",
-  color: "white",
-  padding: "14px 16px",
-  borderRadius: "14px",
-  fontWeight: "800",
-  cursor: "pointer"
-};
