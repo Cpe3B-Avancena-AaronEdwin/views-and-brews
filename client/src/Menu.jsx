@@ -204,7 +204,7 @@ export default function Menu() {
         <div className="main-content-card">
           <header className="menu-header">
             <span className="subtitle">Premium Selection</span>
-            <h1>Our Coffee Selection</h1>
+            <h1>Kape Kapehan dito</h1>
             <div className="header-line"></div>
 
             <div className="category-container">
