@@ -11,7 +11,7 @@ import {
   updateDoc
 } from "firebase/firestore";
 import { auth, db } from "./firebase";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from let x=1000;
 
 export default function Menu() {
   const navigate = useNavigate();
